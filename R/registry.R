@@ -1,0 +1,169 @@
+# R/registry.R
+# Function prefix registry derived from:
+#   - ECMA-376 Part 1 §18.17 (legacy functions, pre-Excel 2010)
+#   - XlsxWriter working_with_formulas docs (future function list)
+#   - EPPlus wiki: Function-prefixes (xlws namespace)
+#   - libxlsxwriter lambda.c examples (_xlpm parameter prefix)
+#
+# Three namespace tiers:
+#   "legacy"  -> no prefix needed
+#   "xlfn"    -> _xlfn. prefix
+#   "xlws"    -> _xlfn._xlws. prefix  (web-service functions)
+#
+# LAMBDA parameters get _xlpm. prefix (handled separately in the parser)
+
+.spaghetti_env$LEGACY <- c(
+  "ABS","ACOS","ACOSH","ADDRESS","AND","AREAS","ASIN","ASINH","ATAN","ATAN2",
+  "ATANH","AVEDEV","AVERAGE","AVERAGEA","AVERAGEIF","AVERAGEIFS","BAHTTEXT",
+  "BESSELI","BESSELJ","BESSELK","BESSELY","BETADIST","BETA.DIST","BETAINV",
+  "BETA.INV","BINOMDIST","BINOM.DIST","BINOM.DIST.RANGE","BINOM.INV",
+  "BITAND","BITLSHIFT","BITOR","BITRSHIFT","BITXOR",
+  "CEILING","CEILING.MATH","CEILING.PRECISE","CELL","CHAR","CHIDIST",
+  "CHIINV","CHITEST","CHISQ.DIST","CHISQ.DIST.RT","CHISQ.INV","CHISQ.INV.RT",
+  "CHISQ.TEST","CHOOSE","CLEAN","CODE","COLUMN","COLUMNS","COMBIN","COMBINA",
+  "COMPLEX","CONCATENATE","CONFIDENCE","CONFIDENCE.NORM","CONFIDENCE.T",
+  "CONVERT","CORREL","COS","COSH","COT","COTH","COUNT","COUNTA","COUNTBLANK",
+  "COUNTIF","COUNTIFS","COUPDAYBS","COUPDAYS","COUPDAYSNC","COUPNCD",
+  "COUPNUM","COUPPCD","COVAR","COVARIANCE.P","COVARIANCE.S","CRITBINOM",
+  "CSC","CSCH","CUMIPMT","CUMPRINC",
+  "DATE","DATEVALUE","DAVERAGE","DAY","DAYS","DAYS360","DB","DBCS","DCOUNT",
+  "DCOUNTA","DDB","DEC2BIN","DEC2HEX","DEC2OCT","DEGREES","DELTA","DEVSQ",
+  "DGET","DISC","DMAX","DMIN","DOLLAR","DOLLARDE","DOLLARFR","DPRODUCT",
+  "DSTDEV","DSTDEVP","DSUM","DURATION","DVAR","DVARP",
+  "EDATE","EFFECT","ENCODEURL","EOMONTH","ERF","ERF.PRECISE","ERFC",
+  "ERFC.PRECISE","ERROR.TYPE","EVEN","EXACT","EXP","EXPONDIST","EXPON.DIST",
+  "F.DIST","F.DIST.RT","F.INV","F.INV.RT","F.TEST","FACT","FACTDOUBLE",
+  "FALSE","FDIST","FINV","FISHER","FISHERINV","FIXED","FLOOR","FLOOR.MATH",
+  "FLOOR.PRECISE","FORECAST","FORECAST.ETS","FORECAST.ETS.CONFINT",
+  "FORECAST.ETS.SEASONALITY","FORECAST.ETS.STAT","FORECAST.LINEAR",
+  "FREQUENCY","FTEST","FV","FVSCHEDULE",
+  "GAMMA","GAMMA.DIST","GAMMA.INV","GAMMADIST","GAMMAINV","GAMMALN",
+  "GAMMALN.PRECISE","GAUSS","GCD","GEOMEAN","GESTEP","GROWTH",
+  "HARMEAN","HEX2BIN","HEX2DEC","HEX2OCT","HLOOKUP","HOUR","HYPERLINK",
+  "HYPGEOM.DIST","HYPGEOMDIST",
+  "IF","IFERROR","IFNA","IFS","IMABS","IMAGINARY","IMARGUMENT","IMCONJUGATE",
+  "IMCOS","IMCOSH","IMCOT","IMCSC","IMCSCH","IMDIV","IMEXP","IMLN","IMLOG10",
+  "IMLOG2","IMPOWER","IMPRODUCT","IMREAL","IMSEC","IMSECH","IMSIN","IMSINH",
+  "IMSQRT","IMSUB","IMSUM","IMTAN","INDEX","INDIRECT","INFO","INT",
+  "INTERCEPT","INTRATE","IPMT","IRR","ISBLANK","ISERR","ISERROR","ISEVEN",
+  "ISFORMULA","ISLOGICAL","ISNA","ISNONTEXT","ISNUMBER","ISODD","ISOWEEKNUM",
+  "ISREF","ISTEXT",
+  "KURT","LARGE","LCM","LEFT","LEFTB","LEN","LENB","LINEST","LN","LOG",
+  "LOG10","LOGEST","LOGINV","LOGNORM.DIST","LOGNORM.INV","LOGNORMDIST",
+  "LOOKUP","LOWER",
+  "MATCH","MAX","MAXA","MAXIFS","MEDIAN","MID","MIDB","MIN","MINA","MINIFS",
+  "MINUTE","MINVERSE","MIRR","MMULT","MOD","MODE","MODE.MULT","MODE.SNGL",
+  "MONTH","MROUND","MULTINOMIAL","MUNIT",
+  "N","NA","NEGBINOM.DIST","NEGBINOMDIST","NETWORKDAYS","NETWORKDAYS.INTL",
+  "NOMINAL","NORM.DIST","NORM.INV","NORM.S.DIST","NORM.S.INV","NORMDIST",
+  "NORMINV","NORMSDIST","NORMSINV","NOT","NOW","NPER","NPV","NUMBERVALUE",
+  "OCT2BIN","OCT2DEC","OCT2HEX","ODD","OFFSET","OR",
+  "PDURATION","PEARSON","PERCENTILE","PERCENTILE.EXC","PERCENTILE.INC",
+  "PERCENTRANK","PERCENTRANK.EXC","PERCENTRANK.INC","PERMUT","PERMUTATIONA",
+  "PHI","PI","PMT","POISSON","POISSON.DIST","POWER","PPMT","PRICE",
+  "PRICEDISC","PRICEMAT","PROB","PRODUCT","PROPER","PV",
+  "QUARTILE","QUARTILE.EXC","QUARTILE.INC",
+  "RADIANS","RAND","RANDBETWEEN","RANK","RANK.AVG","RANK.EQ","RATE",
+  "RECEIVED","REPLACE","REPLACEB","REPT","RIGHT","RIGHTB","ROMAN","ROUND",
+  "ROUNDDOWN","ROUNDUP","ROW","ROWS","RRI","RSQ",
+  "SEARCH","SEARCHB","SEC","SECH","SECOND","SERIESSUM","SIGN","SIN","SINH",
+  "SKEW","SKEW.P","SLN","SLOPE","SMALL","SQRT","SQRTPI","STANDARDIZE",
+  "STDEV","STDEV.P","STDEV.S","STDEVA","STDEVP","STDEVPA","STEYX",
+  "SUBSTITUTE","SUBTOTAL","SUM","SUMIF","SUMIFS","SUMPRODUCT","SUMSQ",
+  "SUMX2MY2","SUMX2PY2","SUMXMY2","SWITCH","SYD",
+  "T","T.DIST","T.DIST.2T","T.DIST.RT","T.INV","T.INV.2T","T.TEST","TAN",
+  "TANH","TBILLEQ","TBILLPRICE","TBILLYIELD","TDIST","TEXT","TEXTAFTER",
+  "TEXTBEFORE","TIME","TIMEVALUE","TINV","TODAY","TRANSPOSE","TREND","TRIM",
+  "TRIMMEAN","TRUE","TRUNC","TTEST","TYPE",
+  "UNICHAR","UNICODE","UPPER",
+  "VALUE","VAR","VAR.P","VAR.S","VARA","VARP","VARPA","VDB","VLOOKUP",
+  "WEBSERVICE","WEEKDAY","WEEKNUM","WEIBULL","WEIBULL.DIST","WORKDAY",
+  "WORKDAY.INTL",
+  "XIRR","XNPV","XOR",
+  "YEAR","YEARFRAC","YIELD","YIELDDISC","YIELDMAT",
+  "ZTEST","Z.TEST"
+)
+
+# Functions requiring _xlfn._xlws. namespace (web-service / dynamic worksheet)
+# Source: XlsxWriter docs, EPPlus EPPlus7 breaking changes wiki
+.spaghetti_env$XLWS <- c(
+  "FILTER", "SORT", "ANCHORARRAY"
+)
+
+# Functions requiring plain _xlfn. prefix
+# Source: XlsxWriter future functions list + EPPlus supported-functions wiki
+.spaghetti_env$XLFN <- c(
+  # Dynamic array (Excel 365)
+  "SEQUENCE","UNIQUE","SORTBY","RANDARRAY","XLOOKUP","XMATCH",
+  "SINGLE",
+  # Lambda family
+  "LAMBDA","LET","MAKEARRAY","MAP","REDUCE","SCAN","BYROW","BYCOL",
+  "ISOMITTED",
+  # Text manipulation (365)
+  "TEXTSPLIT","TEXTJOIN","CONCAT","ARRAYTOTEXT","VALUETOTEXT",
+  # Array manipulation (365)
+  "CHOOSECOLS","CHOOSEROWS","DROP","EXPAND","HSTACK","VSTACK",
+  "TAKE","TOCOL","TOROW","WRAPCOLS","WRAPROWS",
+  # Lookup/reference (365)
+  "IMAGE",
+  # Statistical (post-2010)
+  "DAYS","DAYS360",
+  # Other post-2010
+  "ACOT","ACOTH","ARABIC","BASE","BETA.DIST","BETA.INV",
+  "BINOM.DIST","BINOM.DIST.RANGE","BINOM.INV",
+  "BITAND","BITLSHIFT","BITOR","BITRSHIFT","BITXOR",
+  "CEILING.MATH","CEILING.PRECISE",
+  "CHISQ.DIST","CHISQ.DIST.RT","CHISQ.INV","CHISQ.INV.RT","CHISQ.TEST",
+  "COMBINA","CONFIDENCE.NORM","CONFIDENCE.T",
+  "COVARIANCE.P","COVARIANCE.S","CSC","CSCH","COT","COTH",
+  "DECIMAL","ENCODEURL","ERF.PRECISE","ERFC.PRECISE",
+  "F.DIST","F.DIST.RT","F.INV","F.INV.RT","F.TEST",
+  "FILTERXML",
+  "FLOOR.MATH","FLOOR.PRECISE",
+  "FORECAST.ETS","FORECAST.ETS.CONFINT","FORECAST.ETS.SEASONALITY",
+  "FORECAST.ETS.STAT","FORECAST.LINEAR",
+  "FORMULATEXT","GAMMA","GAMMALN.PRECISE","GAUSS",
+  "HYPGEOM.DIST","ISOWEEKNUM","IMCOSH","IMCOT","IMCSC","IMCSCH",
+  "IMSEC","IMSECH","IMSINH","IMTAN",
+  "ISFORMULA","LET",
+  "LOGNORM.DIST","LOGNORM.INV",
+  "MAXIFS","MINIFS","MODE.MULT","MODE.SNGL","MUNIT",
+  "NEGBINOM.DIST","NETWORKDAYS.INTL","NORM.DIST","NORM.INV",
+  "NORM.S.DIST","NORM.S.INV","NUMBERVALUE",
+  "PDURATION","PERCENTILE.EXC","PERCENTILE.INC",
+  "PERCENTRANK.EXC","PERCENTRANK.INC","PERMUTATIONA","PHI",
+  "POISSON.DIST","QUARTILE.EXC","QUARTILE.INC",
+  "RANK.AVG","RANK.EQ","RRI","SEC","SECH","SHEETS","SHEET",
+  "SKEW.P","STDEV.P","STDEV.S",
+  "T.DIST","T.DIST.2T","T.DIST.RT","T.INV","T.INV.2T","T.TEST",
+  "UNICHAR","UNICODE","VAR.P","VAR.S","WEIBULL.DIST",
+  "WORKDAY.INTL","XOR","Z.TEST",
+  # Text (365)
+  "TEXTAFTER","TEXTBEFORE"
+)
+
+#' Determine the OOXML prefix for a function name
+#'
+#' @param fn Character scalar, function name (uppercase).
+#' @return One of "legacy", "xlfn", or "xlws".
+#' @keywords internal
+.prefix_for <- function(fn) {
+  fn_up <- toupper(fn)
+  if (fn_up %in% .spaghetti_env$XLWS)  return("xlws")
+  if (fn_up %in% .spaghetti_env$XLFN)  return("xlfn")
+  if (fn_up %in% .spaghetti_env$LEGACY) return("legacy")
+  # Unknown function: conservatively apply _xlfn. prefix
+  return("xlfn")
+}
+
+#' Strip any OOXML prefix from a function name
+#'
+#' @param fn Character scalar.
+#' @return Clean function name without namespace prefix.
+#' @keywords internal
+.strip_prefix <- function(fn) {
+  fn <- sub("^_xlfn\\._xlws\\.", "", fn)
+  fn <- sub("^_xlfn\\.",        "", fn)
+  fn <- sub("^_xlpm\\.",        "", fn)
+  fn
+}
