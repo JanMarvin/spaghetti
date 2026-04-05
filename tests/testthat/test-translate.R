@@ -16,7 +16,7 @@ test_that("future functions get _xlfn. prefix", {
   expect_equal(to_xml("=XLOOKUP(A1,B:B,C:C)"), "=_xlfn.XLOOKUP(A1,B:B,C:C)")
   expect_equal(to_xml("=XMATCH(A1,B:B)"), "=_xlfn.XMATCH(A1,B:B)")
   expect_equal(to_xml("=RANDARRAY(5,2)"), "=_xlfn.RANDARRAY(5,2)")
-  expect_equal(to_xml("=LET(X,1,X)"),    "=_xlfn.LET(X,1,X)")
+  expect_equal(to_xml("=LET(X,1,X)"),    "=_xlfn.LET(_xlpm.X,1,_xlpm.X)")
 })
 
 # ── 3. Web-service functions: _xlfn._xlws. prefix ───────────────────────────
@@ -31,13 +31,13 @@ test_that("FILTER and SORT get _xlfn._xlws. prefix", {
 test_that("LAMBDA parameters receive _xlpm. prefix", {
   result <- to_xml("=LAMBDA(temp, (5/9) * (temp-32))(100)")
   expect_match(result, "_xlfn.LAMBDA", fixed = TRUE)
-  expect_match(result, "_xlpm.TEMP",  fixed = TRUE)
+  expect_match(result, "_xlpm.temp",  fixed = TRUE)
 })
 
 test_that("LAMBDA with multiple parameters", {
   result <- to_xml("=LAMBDA(x, y, x + y)(1, 2)")
-  expect_match(result, "_xlpm.X", fixed = TRUE)
-  expect_match(result, "_xlpm.Y", fixed = TRUE)
+  expect_match(result, "_xlpm.x", fixed = TRUE)
+  expect_match(result, "_xlpm.y", fixed = TRUE)
 })
 
 # ── 5. Spilled range operator # → ANCHORARRAY ───────────────────────────────
