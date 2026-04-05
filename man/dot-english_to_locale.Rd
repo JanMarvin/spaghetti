@@ -2,19 +2,19 @@
 % Please edit documentation in R/locales.R
 \name{.english_to_locale}
 \alias{.english_to_locale}
-\title{Translate a function name from English to a locale}
+\title{Translate a function name from English to a locale.}
 \usage{
-.english_to_locale(fn, locale)
+.english_to_locale(fn, locale = NULL)
 }
 \arguments{
-\item{fn}{English function name.}
+\item{fn}{English function name (any case).}
 
-\item{locale}{Two-letter locale code.}
+\item{locale}{Two-letter locale code or NULL (returns fn unchanged).}
 }
 \value{
-Localised name, or fn if not found.
+Localised name, or fn unchanged if no mapping found.
 }
 \description{
-Translate a function name from English to a locale
+Translate a function name from English to a locale.
 }
 \keyword{internal}

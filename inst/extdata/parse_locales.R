@@ -1,146 +1,186 @@
 #' TBX Function Name Extractor
 #'
-#' Parses Microsoft Terminology Collection TBX files to extract localised
-#' Excel function names. Downloads available at:
-#' https://www.microsoft.com/en-us/language/terminology
+#' Parses Microsoft Terminology Collection TBX files to produce a single
+#' data frame with one row per Excel function and one column per locale.
 #'
-#' Why TBX instead of web scraping?
-#' ---------------------------------
-#' The TBX files are Microsoft's authoritative bilingual termbase — the same
-#' source used to localise Office UI strings. They are more complete and more
-#' accurate than the support.microsoft.com index tables.
+#' Output shape
+#' ------------
+#' fn         : English function name  (e.g. "SUM")
+#' description: English description    (e.g. "Adds its arguments")
+#' de, fr, …  : localised names        (e.g. "SUMME", "SOMME", …)
 #'
-#' Approach
-#' ---------
-#' The files are ~50 MB of essentially one long XML line, so we cannot use
-#' readLines() naively or load the whole thing into memory as a DOM.
-#' Instead we use a streaming chunk reader that:
-#'   1. Reads the file in raw character chunks
-#'   2. Reassembles complete <termEntry>...</termEntry> blocks across chunk
-#'      boundaries
-#'   3. For each block, checks whether the en-US <term> matches a known
-#'      Excel function name from the MS-XLSX spec list
-#'   4. If it matches, extracts the localised <term>
+#' This flat structure makes it trivial to:
+#'   - Add a new locale: parse one more TBX, left-join the result column
+#'   - Inspect coverage: filter rows where a locale column is NA
+#'   - Power a UI widget: description field is ready to use as tooltip text
+#'
+#' Parallelism
+#' -----------
+#' Each TBX file is parsed independently, so all files are processed in
+#' parallel using parallel::mclapply (fork-based, Linux/macOS) or
+#' parallel::parLapply (socket cluster, Windows-safe).
+#' Set workers = 1 to disable parallelism for debugging.
 #'
 #' No packages beyond base R are required.
 
+library(parallel)
+
 # ---------------------------------------------------------------------------
-# 1.  The authoritative function list from [MS-XLSX] ABNF
-#     (legacy + future — everything that can appear in a formula)
+# 1.  Function list — pulled directly from the installed package registries
 # ---------------------------------------------------------------------------
 
-EXCEL_FUNCTIONS <- toupper(c(
-  # -- function-list (legacy, no prefix) -----------------------------------
-  spaghetti:::LEGACY,
-  # -- future-function-list (_xlfn.) ---------------------------------------
-  spaghetti:::XLFN,
-  # -- 365 post-spec -------------------------------------------------------
-  spaghetti:::XLWS
-))
+EXCEL_FUNCTIONS <- toupper(unique(c(
+  spaghetti:::.spaghetti_env$LEGACY,
+  spaghetti:::.spaghetti_env$XLFN,
+  spaghetti:::.spaghetti_env$XLWS
+)))
 
-# Fast O(1) lookup via environment (faster than %in% for large sets)
 EXCEL_FUNCTIONS_SET <- new.env(hash = TRUE, parent = emptyenv())
 for (.f in EXCEL_FUNCTIONS) assign(.f, TRUE, envir = EXCEL_FUNCTIONS_SET)
 rm(.f)
 
 # ---------------------------------------------------------------------------
-# 2.  Streaming TBX parser
+# 2.  Low-level XML extraction helpers
 # ---------------------------------------------------------------------------
 
-#' Extract Excel function name mappings from one TBX file.
+#' Extract the raw content of a <langSet xml:lang="TAG"> block.
+#' @keywords internal
+.extract_langset <- function(entry, lang_tag) {
+  tag_esc <- gsub("([.\\^$*+?{}()|\\[\\]])", "\\\\\\1", lang_tag)
+  pat <- paste0('<langSet[^>]+xml:lang="', tag_esc, '"[^>]*>(.*?)</langSet>')
+  m   <- regexpr(pat, entry, perl = TRUE, ignore.case = TRUE)
+  if (m == -1L) return(NULL)
+  regmatches(entry, m)
+}
+
+#' Extract the text content of the first <term>…</term> in a block.
+#' @keywords internal
+.extract_term <- function(block) {
+  m <- regexpr('<term[^>]*>([^<]+)</term>', block, perl = TRUE)
+  if (m == -1L) return(NULL)
+  s <- attr(m, "capture.start")[1L]
+  l <- attr(m, "capture.length")[1L]
+  if (is.na(s) || s < 1L) return(NULL)
+  substr(block, s, s + l - 1L)
+}
+
+#' Extract the text content of the first <descrip type="definition">…</descrip>.
+#' Falls back to any <descrip> if no definition-typed one is found.
+#' @keywords internal
+.extract_descrip <- function(block) {
+  # Prefer type="definition"
+  m <- regexpr('<descrip[^>]+type="definition"[^>]*>([^<]+)</descrip>',
+               block, perl = TRUE, ignore.case = TRUE)
+  if (m == -1L) {
+    # Fallback: any <descrip>
+    m <- regexpr('<descrip[^>]*>([^<]+)</descrip>', block, perl = TRUE)
+  }
+  if (m == -1L) return(NA_character_)
+  s <- attr(m, "capture.start")[1L]
+  l <- attr(m, "capture.length")[1L]
+  if (is.na(s) || s < 1L) return(NA_character_)
+  trimws(substr(block, s, s + l - 1L))
+}
+
+# ---------------------------------------------------------------------------
+# 3.  Per-entry parser — returns list(en, desc, loc) or NULL
+# ---------------------------------------------------------------------------
+
+#' Parse one termEntry block.
 #'
-#' @param tbx_path   Path to the .tbx file.
-#' @param locale_tag BCP-47 language tag as used in the file's xml:lang
-#'                   attributes, e.g. "de", "fr", "fr-FR". Matched
-#'                   case-insensitively; both short and full forms work.
-#' @param chunk_size Characters per read (default 1 MB). Larger values
-#'                   are faster but use more memory.
-#'
-#' @return Named character vector: names = localised function names (upper),
-#'         values = English function names (upper). Identical pairs excluded.
-# ---------------------------------------------------------------------------
-# 2.  Streaming TBX parser (Updated logic)
-# ---------------------------------------------------------------------------
-# ... [Keep Section 1: EXCEL_FUNCTIONS_SET exactly as in your file] ...
+#' @param entry     Raw XML string for one <termEntry>…</termEntry>.
+#' @param locale_tag xml:lang tag for the target locale (e.g. "de").
+#' @return list(en = "SUM", desc = "Adds its arguments", loc = "SUMME")
+#'         or NULL if entry is not a relevant Excel function.
+#' @keywords internal
+.extract_row <- function(entry, locale_tag) {
 
-# ---------------------------------------------------------------------------
-# 3.  termEntry extraction helpers (Fixed for .ETS and _xlfn)
-# ---------------------------------------------------------------------------
+  # Only bother with entries that mention Excel somewhere in a description
+  if (!grepl("<descrip[^>]*>.*?Excel.*?</descrip>",
+             entry, ignore.case = TRUE, perl = TRUE)) return(NULL)
 
-.extract_pair <- function(entry, locale_tag) {
-
-  # --- English term -------------------------------------------------------
+  # ── English term ────────────────────────────────────────────────────────
   en_block <- .extract_langset(entry, "en-US")
   if (is.null(en_block)) return(NULL)
 
   en_raw <- .extract_term(en_block)
   if (is.null(en_raw)) return(NULL)
 
-  # 1. Strip annotations like 'function', '()', or '(constant)'
-  # We use ignore.case=TRUE because TBX varies between 'Function' and 'function'
-  en_stripped <- trimws(gsub("(?i)\\s*\\(?function\\)?\\s*$", "", en_raw))
-  en_stripped <- gsub("\\(\\)\\s*$", "", en_stripped)
-
-  # 2. Safety check: If stripping resulted in empty string, abort
+  # Strip trailing annotation: "function", "()", "(constant)", etc.
+  en_stripped <- trimws(gsub("(?i)\\s*\\(?function\\)?\\s*$|\\(\\)\\s*$",
+                             "", en_raw, perl = TRUE))
   if (nchar(en_stripped) == 0) return(NULL)
 
   en_clean <- toupper(en_stripped)
 
-  # 3. Fallback: If not found, try stripping the Excel internal prefix '_xlfn.'
-  # This is often why modern functions like FORECAST.ETS are missed
-  is_known <- exists(en_clean, envir = EXCEL_FUNCTIONS_SET, inherits = FALSE)
-
-  if (!is_known && grepl("^_XLFN\\.", en_clean)) {
-    en_clean <- gsub("^_XLFN\\.", "", en_clean)
-    is_known <- exists(en_clean, envir = EXCEL_FUNCTIONS_SET, inherits = FALSE)
+  # Strip accidental _xlfn. prefix that occasionally appears in TBX data
+  if (!exists(en_clean, envir = EXCEL_FUNCTIONS_SET, inherits = FALSE)) {
+    en_clean <- sub("^_XLFN\\.", "", en_clean)
   }
+  if (!exists(en_clean, envir = EXCEL_FUNCTIONS_SET, inherits = FALSE)) return(NULL)
+  if (grepl("\\s", en_clean)) return(NULL)
 
-  # Final English validation
-  if (!is_known) return(NULL)
-  if (grepl("\\s", en_clean)) return(NULL) # Functions cannot have spaces
+  # ── English description ─────────────────────────────────────────────────
+  desc <- .extract_descrip(en_block)
 
-  # --- Localised term -----------------------------------------------------
+  # ── Localised term ──────────────────────────────────────────────────────
   loc_block <- .extract_langset(entry, locale_tag)
   if (is.null(loc_block)) return(NULL)
 
   loc_raw <- .extract_term(loc_block)
   if (is.null(loc_raw)) return(NULL)
 
-  # Clean German: Strip "-Funktion" and convert to Upper
-  loc_clean <- trimws(gsub("(?i)[\\s-]*\\(?funktion\\)?\\s*$", "", loc_raw))
-  loc_clean <- toupper(loc_clean)
+  # Strip locale-language annotation suffixes ("-Funktion", "-fonction", etc.)
+  loc_clean <- trimws(gsub(
+    paste0("(?i)[\\s-]*\\(",
+           "funktion|fonction|funzione|functie|",
+           "funkcja|funktioner|función|função",
+           "\\)?\\s*$"),
+    "", loc_raw, perl = TRUE
+  ))
+  loc_clean <- toupper(trimws(loc_clean))
 
-  # Validation of the localized result
   if (is.na(loc_clean) || nchar(loc_clean) < 2) return(NULL)
-  if (loc_clean == en_clean) return(NULL)  # Skip if not translated
-  if (grepl("\\s", loc_clean)) return(NULL) # Skip descriptions with spaces
+  if (loc_clean == en_clean)   return(NULL)   # untranslated — skip
+  if (grepl("\\s", loc_clean)) return(NULL)   # multi-word — not a function name
 
-  list(en = en_clean, loc = loc_clean)
+  list(en = en_clean, desc = desc, loc = loc_clean)
 }
 
 # ---------------------------------------------------------------------------
-# 2.  Streaming TBX parser (Updated with Product Filter)
+# 4.  Streaming parser for one TBX file
 # ---------------------------------------------------------------------------
 
-parse_tbx <- function(tbx_path, locale_tag, chunk_size = 1e6) {
-  stopifnot(file.exists(tbx_path))
+#' Stream a TBX file and return a two-column data frame: fn, <locale>.
+#'
+#' @param tbx_path   Path to the .tbx file.
+#' @param locale_tag BCP-47 tag matching xml:lang in the file (e.g. "de").
+#' @param locale_col Column name for the localised names in the output frame.
+#' @param chunk_size Bytes per read chunk (default 1 MB).
+#'
+#' @return data.frame(fn = character, <locale_col> = character)
+#'         Only rows where a translated name was found are included.
+parse_tbx <- function(tbx_path, locale_tag,
+                      locale_col  = locale_tag,
+                      chunk_size  = 1e6) {
 
+  stopifnot(file.exists(tbx_path))
   con <- file(tbx_path, open = "rb")
   on.exit(close(con), add = TRUE)
 
   buffer    <- ""
-  results   <- character(0)
+  rows      <- list()
   n_scanned <- 0L
 
-  message("  Parsing: ", basename(tbx_path), " [locale: ", locale_tag, "]")
+  message("  [", locale_col, "] Parsing: ", basename(tbx_path))
 
   repeat {
     raw <- readBin(con, what = "raw", n = chunk_size)
     if (!length(raw)) break
     chunk <- rawToChar(raw)
     Encoding(chunk) <- "UTF-8"
-
     buffer <- paste0(buffer, chunk)
+
     parts <- strsplit(buffer, "(?=<termEntry[ >])", perl = TRUE)[[1]]
 
     if (length(parts) > 1) {
@@ -152,152 +192,310 @@ parse_tbx <- function(tbx_path, locale_tag, chunk_size = 1e6) {
 
     for (entry in complete) {
       if (!grepl("</termEntry>", entry, fixed = TRUE)) next
-
-      # Ensure we only look at Excel entries to avoid MOICE/SSAS/DAX acronyms
-      if (!grepl("<descrip[^>]*>.*?Excel.*?</descrip>", entry, ignore.case = TRUE)) next
-
       n_scanned <- n_scanned + 1L
-      pair <- .extract_pair(entry, locale_tag)
-      if (!is.null(pair)) results[[pair$loc]] <- pair$en
+      row <- .extract_row(entry, locale_tag)
+      if (!is.null(row)) rows[[length(rows) + 1L]] <- row
     }
   }
 
-  message(sprintf("    %d entries scanned, %d Excel functions matched",
-                  n_scanned, length(results)))
-  results
-}
+  # Flush last entry in buffer
+  if (grepl("</termEntry>", buffer, fixed = TRUE)) {
+    row <- .extract_row(buffer, locale_tag)
+    if (!is.null(row)) rows[[length(rows) + 1L]] <- row
+  }
 
-#' Pull the content of the first <langSet xml:lang="TAG"> block.
-#' @keywords internal
-.extract_langset <- function(entry, lang_tag) {
-  # lang_tag is literal (not a regex) — escape it for use in pattern
-  tag_esc <- gsub("([.\\^$*+?{}()|\\[\\]])", "\\\\\\1", lang_tag)
-  pat <- paste0('<langSet[^>]+xml:lang="', tag_esc, '"[^>]*>(.*?)</langSet>')
-  m <- regexpr(pat, entry, perl = TRUE, ignore.case = TRUE)
-  if (m == -1L) return(NULL)
-  regmatches(entry, m)
-}
+  message(sprintf("    -> %d entries scanned, %d functions matched",
+                  n_scanned, length(rows)))
 
-#' Pull the text content of the first <term ...>TEXT</term>.
-#' @keywords internal
-.extract_term <- function(block) {
-  m <- regexpr('<term[^>]*>([^<]+)</term>', block, perl = TRUE)
-  if (m == -1L) return(NULL)
-  starts  <- attr(m, "capture.start")
-  lengths <- attr(m, "capture.length")
-  if (is.na(starts[1]) || starts[1] < 1L) return(NULL)
-  substr(block, starts[1], starts[1] + lengths[1] - 1L)
+  if (length(rows) == 0) {
+    return(data.frame(fn          = character(0),
+                      description = character(0),
+                      stringsAsFactors = FALSE,
+                      check.names = FALSE))
+  }
+
+  df <- data.frame(
+    fn          = vapply(rows, `[[`, character(1), "en"),
+    description = vapply(rows, `[[`, character(1), "desc"),
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+  df[[locale_col]] <- vapply(rows, `[[`, character(1), "loc")
+
+  # Keep only the first match per English function name
+  df[!duplicated(df$fn), ]
 }
 
 # ---------------------------------------------------------------------------
-# 4.  Multi-file driver
+# 5.  Auto-detect TBX files in a folder
 # ---------------------------------------------------------------------------
 
-#' Parse a named list of TBX files and write R/locales_generated.R
+#' Detect TBX files in a directory and infer locale codes from filenames.
 #'
-#' @param tbx_files Named list: names = two-letter locale codes ("de","fr",…),
-#'                  values = file paths to the corresponding TBX files.
-#' @param outfile   Destination R file (default "R/locales_generated.R").
+#' Filename → locale heuristic (case-insensitive):
+#'   GERMAN      → de    FRENCH   → fr    SPANISH  → es
+#'   ITALIAN     → it    DUTCH    → nl    PORTUGUESE → pt
+#'   POLISH      → pl    SWEDISH  → sv    DANISH   → da
+#'   FINNISH     → fi    NORWEGIAN → no   CZECH    → cs
+#'   HUNGARIAN   → hu    ROMANIAN → ro    TURKISH  → tr
 #'
-#' @return Invisibly: list(fwd, rev) of the generated maps.
+#' Unrecognised filenames are skipped with a warning.
+#'
+#' @param folder Path to directory containing .tbx files.
+#' @return Named character vector: names = locale codes, values = file paths.
+detect_tbx_files <- function(folder) {
+  name_to_locale <- c(
+    german      = "de", deutsch    = "de",
+    french      = "fr", francais   = "fr",
+    spanish     = "es", espanol    = "es",
+    italian     = "it", italiano   = "it",
+    dutch       = "nl", nederlands = "nl",
+    portuguese  = "pt", portugues  = "pt",
+    polish      = "pl", polski     = "pl",
+    swedish     = "sv", svenska    = "sv",
+    danish      = "da", dansk      = "da",
+    finnish     = "fi", suomi      = "fi",
+    norwegian   = "no", norsk      = "no",
+    czech       = "cs",
+    hungarian   = "hu",
+    romanian    = "ro",
+    turkish     = "tr"
+  )
+
+  files  <- list.files(folder, pattern = "\\.tbx$", full.names = TRUE,
+                       ignore.case = TRUE)
+  result <- character(0)
+
+  for (f in files) {
+    base  <- tolower(tools::file_path_sans_ext(basename(f)))
+    # Try longest match first (e.g. "portuguese (portugal)")
+    match <- NA_character_
+    for (nm in names(name_to_locale)) {
+      if (grepl(nm, base, fixed = TRUE)) {
+        match <- name_to_locale[[nm]]
+        break
+      }
+    }
+    if (is.na(match)) {
+      warning("Cannot infer locale for: ", basename(f), " — skipping")
+    } else {
+      result[[match]] <- f
+    }
+  }
+
+  if (length(result) == 0)
+    stop("No recognised TBX files found in: ", folder)
+
+  message("Detected ", length(result), " locale(s): ",
+          paste(names(result), collapse = ", "))
+  result
+}
+
+# ---------------------------------------------------------------------------
+# 6.  Main driver — parallel parse + join into one data frame
+# ---------------------------------------------------------------------------
+
+#' Parse all TBX files in a folder and write a flat data frame.
+#'
+#' The output data frame has columns:
+#'   fn          : English function name
+#'   description : English description (from TBX definition element)
+#'   <locale>    : One column per locale, containing the localised name
+#'                 (NA where no translation was found)
+#'
+#' The frame is written to two places:
+#'   outfile_rds : Binary RDS (fast to load at package startup)
+#'   outfile_r   : Human-readable R source (for version control / inspection)
+#'
+#' @param folder     Directory containing .tbx files (auto-detected).
+#' @param tbx_files  Optional named vector of locale → path (overrides folder).
+#' @param outfile_rds Destination for the RDS file.
+#' @param outfile_r   Destination for the generated R source file.
+#' @param workers    Number of parallel workers. Defaults to detected cores - 1,
+#'                   capped at the number of locale files. Set to 1 to disable.
+#' @param locale_tags Named list overriding the xml:lang tag per locale code.
+#'
+#' @return The data frame (invisibly). Side effect: writes outfile_rds and
+#'         outfile_r.
 #'
 #' @examples
 #' \dontrun{
-#' parse_all_tbx(list(
-#'   de = "~/Downloads/GERMAN.tbx",
-#'   fr = "~/Downloads/FRENCH.tbx",
-#'   es = "~/Downloads/SPANISH.tbx",
-#'   it = "~/Downloads/ITALIAN.tbx",
-#'   nl = "~/Downloads/DUTCH.tbx",
-#'   pt = "~/Downloads/PORTUGUESE.tbx",
-#'   pl = "~/Downloads/POLISH.tbx",
-#'   sv = "~/Downloads/SWEDISH.tbx"
+#' # Auto-detect all TBX files in a folder:
+#' parse_all_tbx("~/Downloads/MicrosoftTermCollection")
+#'
+#' # Or supply paths explicitly:
+#' parse_all_tbx(tbx_files = list(
+#'   de = "~/Downloads/MicrosoftTermCollection/GERMAN.tbx",
+#'   fr = "~/Downloads/MicrosoftTermCollection/FRENCH.tbx"
 #' ))
 #' }
-parse_all_tbx <- function(tbx_files,
-                          outfile = "R/locales_generated.R") {
+parse_all_tbx <- function(
+    folder      = NULL,
+    tbx_files   = NULL,
+    outfile_rds = "inst/extdata/excel_functions.rds",
+    outfile_r   = "data-raw/excel_functions_generated.R",
+    workers     = max(1L, parallel::detectCores(logical = FALSE) - 1L),
+    locale_tags = list(
+      de = "de", fr = "fr", es = "es", it = "it",
+      nl = "nl", pt = "pt", pl = "pl", sv = "sv",
+      da = "da", fi = "fi", no = "no", cs = "cs",
+      hu = "hu", ro = "ro", tr = "tr"
+    )
+) {
 
-  # xml:lang tag used inside each TBX file (may differ from locale code)
-  locale_tags <- list(
-    de = "de", fr = "fr", es = "es", it = "it",
-    nl = "nl", pt = "pt", pl = "pl", sv = "sv"
-  )
-
-  locales_fwd <- list()
-  locales_rev <- list()
-
-  for (loc in names(tbx_files)) {
-    path <- tbx_files[[loc]]
-    tag  <- if (loc %in% names(locale_tags)) locale_tags[[loc]] else loc
-
-    message("\n[", loc, "]")
-    raw <- parse_tbx(path, locale_tag = tag)
-
-    fwd <- as.list(raw)
-    rev <- list()
-    for (loc_nm in names(fwd)) {
-      en_nm <- fwd[[loc_nm]]
-      if (!en_nm %in% names(rev)) rev[[en_nm]] <- loc_nm
-    }
-
-    locales_fwd[[loc]] <- fwd
-    locales_rev[[loc]] <- rev
-    message(sprintf("  -> %d unique mappings", length(fwd)))
+  # ── Resolve file list ────────────────────────────────────────────────────
+  if (is.null(tbx_files)) {
+    if (is.null(folder)) stop("Provide either `folder` or `tbx_files`.")
+    tbx_files <- detect_tbx_files(folder)
   }
 
-  # ---- Write generated R file -------------------------------------------
-  message("\nWriting ", outfile, " ...")
-  con <- file(outfile, open = "wt", encoding = "UTF-8")
+  locales <- names(tbx_files)
+  workers <- min(workers, length(locales))
+  message("\n=== Parsing ", length(locales), " TBX file(s) with ",
+          workers, " worker(s) ===\n")
 
-  cat(
-    "# Auto-generated by data-raw/parse_locales.R — DO NOT EDIT MANUALLY\n",
-    "# Source : Microsoft Terminology Collection TBX files\n",
-    "#          https://www.microsoft.com/en-us/language/terminology\n",
-    "# Method : Streaming termEntry extraction matched to MS-XLSX spec list\n\n",
-    "#' @keywords internal\n",
-    file = con, sep = ""
+  # ── Build argument list for each parse job ───────────────────────────────
+  jobs <- lapply(locales, function(loc) {
+    list(
+      tbx_path   = tbx_files[[loc]],
+      locale_tag = if (loc %in% names(locale_tags)) locale_tags[[loc]] else loc,
+      locale_col = loc
+    )
+  })
+  names(jobs) <- locales
+
+  # ── Parallel dispatch ────────────────────────────────────────────────────
+  .run_job <- function(job) {
+    parse_tbx(job$tbx_path, job$locale_tag, job$locale_col)
+  }
+
+  on_windows <- .Platform$OS.type == "windows"
+
+  locale_frames <- if (workers > 1L && !on_windows) {
+    parallel::mclapply(jobs, .run_job, mc.cores = workers)
+  } else if (workers > 1L && on_windows) {
+    cl <- parallel::makeCluster(workers)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+    # Export everything the workers need
+    parallel::clusterExport(cl, c(
+      "parse_tbx", ".extract_row", ".extract_langset",
+      ".extract_term", ".extract_descrip", "EXCEL_FUNCTIONS_SET"
+    ), envir = environment())
+    parallel::parLapply(cl, jobs, .run_job)
+  } else {
+    lapply(jobs, .run_job)
+  }
+
+  # ── Seed with the full English function list ─────────────────────────────
+  # Start from the canonical function list so every function appears as a row
+  # even if no locale could translate it (those columns will be NA).
+  master <- data.frame(
+    fn          = sort(EXCEL_FUNCTIONS),
+    description = NA_character_,
+    stringsAsFactors = FALSE
   )
 
-  .write_list <- function(varname, data, con) {
-    cat(sprintf("%s <- list(\n", varname), file = con)
-    locs <- sort(names(data))
-    for (li in seq_along(locs)) {
-      loc   <- locs[[li]]
-      items <- data[[loc]]
-      keys  <- sort(names(items))
-      cat(sprintf("  %s = c(\n", loc), file = con)
-      for (i in seq_along(keys)) {
-        k  <- gsub('"', '\\"', keys[[i]],          fixed = TRUE)
-        v  <- gsub('"', '\\"', items[[keys[[i]]]], fixed = TRUE)
-        cm <- if (i < length(keys)) "," else ""
-        cat(sprintf('    "%s" = "%s"%s\n', k, v, cm), file = con)
+  # ── Left-join each locale result onto the master frame ───────────────────
+  for (loc in locales) {
+    lf <- locale_frames[[loc]]
+    if (nrow(lf) == 0) {
+      master[[loc]] <- NA_character_
+      next
+    }
+
+    # Fill in descriptions from this locale's parse (English descriptions
+    # are in every TBX file; take the first non-NA we encounter)
+    desc_map <- setNames(lf$description, lf$fn)
+    missing_desc <- is.na(master$description) & master$fn %in% names(desc_map)
+    master$description[missing_desc] <- desc_map[master$fn[missing_desc]]
+
+    # Add localised name column
+    loc_map       <- setNames(lf[[loc]], lf$fn)
+    master[[loc]] <- loc_map[master$fn]
+  }
+
+  message(sprintf(
+    "\nMaster frame: %d functions x %d locale(s)",
+    nrow(master), length(locales)
+  ))
+
+  coverage <- vapply(locales, function(l) {
+    sum(!is.na(master[[l]]))
+  }, integer(1))
+  message("Coverage per locale:")
+  for (loc in locales)
+    message(sprintf("  %-4s : %d / %d", loc, coverage[[loc]], nrow(master)))
+
+  # ── Write RDS (fast binary, used by the package at runtime) ──────────────
+  if (!is.null(outfile_rds)) {
+    dir.create(dirname(outfile_rds), showWarnings = FALSE, recursive = TRUE)
+    saveRDS(master, outfile_rds)
+    message("\nSaved RDS: ", outfile_rds)
+  }
+
+  # ── Write human-readable R source (for version control) ──────────────────
+  if (!is.null(outfile_r)) {
+    dir.create(dirname(outfile_r), showWarnings = FALSE, recursive = TRUE)
+    con <- file(outfile_r, open = "wt", encoding = "UTF-8")
+
+    cat(
+      "# Auto-generated by data-raw/parse_locales.R — DO NOT EDIT MANUALLY\n",
+      "# Source : Microsoft Terminology Collection TBX files\n",
+      "#          https://www.microsoft.com/en-us/language/terminology\n",
+      "# Columns: fn, description, ",
+      paste(locales, collapse = ", "), "\n\n",
+      file = con, sep = ""
+    )
+
+    cat(".spaghetti_env$FUNCTIONS <- data.frame(\n", file = con)
+
+    write_col <- function(col_name, values, last = FALSE) {
+      is_char <- is.character(values)
+      cat(sprintf("  %s = c(\n", col_name), file = con)
+      for (i in seq_along(values)) {
+        comma <- if (i < length(values)) "," else ""
+        if (is_char) {
+          v <- if (is.na(values[i])) "NA_character_"
+          else paste0('"', gsub('"', '\\"', values[i], fixed = TRUE), '"')
+        } else {
+          v <- as.character(values[i])
+        }
+        cat(sprintf("    %s%s\n", v, comma), file = con)
       }
-      lc <- if (li < length(locs)) "," else ""
-      cat(sprintf("  )%s\n", lc), file = con)
+      trailing <- if (last) "\n  )" else "\n  ),"
+      cat(trailing, "\n", file = con, sep = "")
     }
-    cat(")\n\n", file = con)
+
+    all_cols  <- c("fn", "description", locales)
+    for (ci in seq_along(all_cols)) {
+      col  <- all_cols[[ci]]
+      last <- ci == length(all_cols)
+      write_col(col, master[[col]], last = last)
+    }
+
+    cat("  stringsAsFactors = FALSE\n)\n", file = con)
+    close(con)
+    message("Saved R source: ", outfile_r)
   }
 
-  .write_list(".spaghetti_env$LOCALES",     locales_fwd, con)
-  .write_list(".spaghetti_env$LOCALES_REV", locales_rev, con)
-  close(con)
-
-  total <- sum(lengths(locales_fwd))
-  message("Done. ", total, " total locale mappings written to ", outfile)
-  invisible(list(fwd = locales_fwd, rev = locales_rev))
+  invisible(master)
 }
 
 # ---------------------------------------------------------------------------
-# 5.  Run — edit paths to match where you saved the TBX files
+# 7.  Run
 # ---------------------------------------------------------------------------
 
-parse_all_tbx(list(
-  de = "~/Downloads/MicrosoftTermCollection/GERMAN.tbx",
-  fr = "~/Downloads/MicrosoftTermCollection/FRENCH.tbx",
-  es = "~/Downloads/MicrosoftTermCollection/SPANISH.tbx",
-  it = "~/Downloads/MicrosoftTermCollection/ITALIAN.tbx",
-  nl = "~/Downloads/MicrosoftTermCollection/DUTCH.tbx",
-  pt = "~/Downloads/MicrosoftTermCollection/PORTUGUESE (PORTUGAL).tbx",
-  pl = "~/Downloads/MicrosoftTermCollection/POLISH.tbx",
-  sv = "~/Downloads/MicrosoftTermCollection/SWEDISH.tbx"
-))
+# Auto-detect all TBX files in the folder:
+result <- parse_all_tbx("~/Downloads/MicrosoftTermCollection")
+
+# Or supply paths explicitly, e.g.:
+# result <- parse_all_tbx(tbx_files = list(
+#   de = "~/Downloads/MicrosoftTermCollection/GERMAN.tbx",
+#   fr = "~/Downloads/MicrosoftTermCollection/FRENCH.tbx",
+#   es = "~/Downloads/MicrosoftTermCollection/SPANISH.tbx",
+#   it = "~/Downloads/MicrosoftTermCollection/ITALIAN.tbx",
+#   nl = "~/Downloads/MicrosoftTermCollection/DUTCH.tbx",
+#   pt = "~/Downloads/MicrosoftTermCollection/PORTUGUESE (PORTUGAL).tbx",
+#   pl = "~/Downloads/MicrosoftTermCollection/POLISH.tbx",
+#   sv = "~/Downloads/MicrosoftTermCollection/SWEDISH.tbx"
+# ))

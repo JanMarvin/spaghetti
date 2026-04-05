@@ -2,7 +2,9 @@
 
 export(from_xml)
 export(from_xml_v)
+export(function_description)
 export(function_prefix)
+export(function_table)
 export(is_ooxml)
 export(round_trip)
 export(supported_locales)

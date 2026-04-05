@@ -1,32 +1,30 @@
----
-output: github_document
----
 
 # spaghetti
 
-Bidirectional translator between Excel user-facing formulas (as seen in the
-formula bar) and the OOXML storage format (as found inside `.xlsx` XML).
+Bidirectional translator between Excel user-facing formulas (as seen in
+the formula bar) and the OOXML storage format (as found inside `.xlsx`
+XML).
 
 ## Why does this exist?
 
-When you write a formula with `openxlsx2::wb_add_formula()`, the string goes
-directly into the XML. Excel 365 functions like `LAMBDA`, `XLOOKUP`, `FILTER`,
-or `SEQUENCE` need namespace prefixes in storage that you never type in the
-formula bar:
+When you write a formula with `openxlsx2::wb_add_formula()`, the string
+goes directly into the XML. Excel 365 functions like `LAMBDA`,
+`XLOOKUP`, `FILTER`, or `SEQUENCE` need namespace prefixes in storage
+that you never type in the formula bar:
 
-| You type | XML must contain |
-|---|---|
-| `=SEQUENCE(10)` | `=_xlfn.SEQUENCE(10)` |
+| You type                    | XML must contain                        |
+|-----------------------------|-----------------------------------------|
+| `=SEQUENCE(10)`             | `=_xlfn.SEQUENCE(10)`                   |
 | `=FILTER(A1:A10, B1:B10>5)` | `=_xlfn._xlws.FILTER(A1:A10, B1:B10>5)` |
-| `=LAMBDA(x, x * 2)` | `=_xlfn.LAMBDA(_xlpm.x, _xlpm.x * 2)` |
-| `=SUM(A1#)` | `=SUM(_xlfn.ANCHORARRAY(A1))` |
+| `=LAMBDA(x, x * 2)`         | `=_xlfn.LAMBDA(_xlpm.x, _xlpm.x * 2)`   |
+| `=SUM(A1#)`                 | `=SUM(_xlfn.ANCHORARRAY(A1))`           |
 
-Without the prefixes the formula opens as `#NAME?` in Excel.
-`spaghetti` handles the translation so you don't have to remember the rules.
+Without the prefixes the formula opens as `#NAME?` in Excel. `spaghetti`
+handles the translation so you don’t have to remember the rules.
 
 ## Installation
 
-```r
+``` r
 # install.packages("remotes")
 remotes::install_github("JanMarvin/spaghetti")
 ```
@@ -35,11 +33,11 @@ remotes::install_github("JanMarvin/spaghetti")
 
 ### Example 1 — Dynamic array formulas (SEQUENCE, UNIQUE, XLOOKUP)
 
-The most common pain point: Excel 365 functions that return spilled arrays.
-Write them in plain formula-bar syntax; `to_xml()` adds the required prefixes
-before handing off to openxlsx2.
+The most common pain point: Excel 365 functions that return spilled
+arrays. Write them in plain formula-bar syntax; `to_xml()` adds the
+required prefixes before handing off to openxlsx2.
 
-```{r warning=FALSE}
+``` r
 library(spaghetti)
 library(openxlsx2)
 
@@ -84,9 +82,9 @@ if (interactive()) wb$open()
 ### Example 2 — LAMBDA and LET for reusable logic
 
 `LAMBDA` parameters need an additional `_xlpm.` prefix inside the XML —
-something that's nearly impossible to remember manually.
+something that’s nearly impossible to remember manually.
 
-```{r warning=FALSE}
+``` r
 library(spaghetti)
 library(openxlsx2)
 
@@ -140,12 +138,13 @@ if (interactive()) wb$open()
 
 ### Example 3 — Reading back OOXML formulas and translating for display
 
-When you load an existing `.xlsx` with `wb_to_df(show_formula = TRUE)` or
-inspect `wb$worksheets`, the formulas come back in OOXML storage format with
-all prefixes intact. `from_xml()` strips them back to readable form — useful
-for auditing, diffing, or displaying formulas to users.
+When you load an existing `.xlsx` with `wb_to_df(show_formula = TRUE)`
+or inspect `wb$worksheets`, the formulas come back in OOXML storage
+format with all prefixes intact. `from_xml()` strips them back to
+readable form — useful for auditing, diffing, or displaying formulas to
+users.
 
-```{r warning=FALSE}
+``` r
 library(spaghetti)
 library(openxlsx2)
 
@@ -172,7 +171,12 @@ readable <- as.data.frame(lapply(raw_formulas, function(col) {
 # C2: =SEQUENCE(5)
 # D2: =XLOOKUP(C2#, A2:A11, B2:B11)
 print(readable)
+```
 
+    ##              C                             D
+    ## 1 =SEQUENCE(5) =XLOOKUP(C2#, A2:A11, B2:B11)
+
+``` r
 # Bonus: translate to German for a localised formula audit report
 readable_de <- as.data.frame(lapply(raw_formulas, function(col) {
   ifelse(is_ooxml(col), from_xml(col, locale = "de"), col)
@@ -181,10 +185,13 @@ readable_de <- as.data.frame(lapply(raw_formulas, function(col) {
 print(readable_de)
 ```
 
+    ##             C                              D
+    ## 1 =SEQUENZ(5) =XVERWEIS(C2#; A2:A11; B2:B11)
+
 ## Core functions
 
 | Function | Direction | Description |
-|---|---|---|
+|----|----|----|
 | `to_xml(formula, locale)` | Excel → OOXML | Add `_xlfn.`, `_xlws.`, `_xlpm.` prefixes |
 | `from_xml(formula, locale)` | OOXML → Excel | Strip all prefixes |
 | `to_xml_v(formulas)` | vectorised | Apply `to_xml()` to a character vector |
@@ -195,13 +202,16 @@ print(readable_de)
 
 ## Localisation
 
-`openxlsx2` only accepts English function names. If you have formulas authored
-in a localised Excel (e.g. German `SUMMEWENN` instead of `SUMIF`), pass the
-`locale` argument to `to_xml()` to translate first:
+`openxlsx2` only accepts English function names. If you have formulas
+authored in a localised Excel (e.g. German `SUMMEWENN` instead of
+`SUMIF`), pass the `locale` argument to `to_xml()` to translate first:
 
-```{r}
+``` r
 # German formula → OOXML (translates SUMMEWENNS, SVERWEIS, etc.)
 to_xml("=SUMMEWENNS(C2:C10, A2:A10, \"Berlin\")", locale = "de")
 ```
 
-Supported locales: `de`, `fr`, `es`, `it`, `nl`, `pt`, `pl`, `sv`, others ...
+    ## [1] "=SUMIFS(C2:C10, A2:A10, \"Berlin\")"
+
+Supported locales: `de`, `fr`, `es`, `it`, `nl`, `pt`, `pl`, `sv`,
+others …

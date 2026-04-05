@@ -2,15 +2,16 @@
 % Please edit documentation in R/locales.R
 \name{supported_locales}
 \alias{supported_locales}
-\title{List supported locales}
+\title{List supported locale codes.}
 \usage{
 supported_locales()
 }
 \value{
-Character vector of supported locale codes.
+Character vector of locale codes (e.g. \verb{c("de", "fr", "es", …)}).
 }
 \description{
-List supported locales
+Returns the locale columns present in the FUNCTIONS data frame, i.e. the
+locales for which at least partial translation data was loaded.
 }
 \examples{
 supported_locales()
