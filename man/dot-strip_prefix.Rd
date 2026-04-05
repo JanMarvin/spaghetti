@@ -2,7 +2,7 @@
 % Please edit documentation in R/registry.R
 \name{.strip_prefix}
 \alias{.strip_prefix}
-\title{Strip any OOXML prefix from a function name}
+\title{Strip any OOXML namespace prefix from a function name.}
 \usage{
 .strip_prefix(fn)
 }
@@ -10,9 +10,9 @@
 \item{fn}{Character scalar.}
 }
 \value{
-Clean function name without namespace prefix.
+Clean name without _xlfn., _xlfn._xlws., or _xlpm. prefix.
 }
 \description{
-Strip any OOXML prefix from a function name
+Strip any OOXML namespace prefix from a function name.
 }
 \keyword{internal}

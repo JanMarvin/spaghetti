@@ -2,17 +2,17 @@
 % Please edit documentation in R/registry.R
 \name{.prefix_for}
 \alias{.prefix_for}
-\title{Determine the OOXML prefix for a function name}
+\title{Determine the OOXML namespace tier for a function name.}
 \usage{
 .prefix_for(fn)
 }
 \arguments{
-\item{fn}{Character scalar, function name (uppercase).}
+\item{fn}{Character scalar, function name (any case).}
 }
 \value{
 One of "legacy", "xlfn", or "xlws".
 }
 \description{
-Determine the OOXML prefix for a function name
+Determine the OOXML namespace tier for a function name.
 }
 \keyword{internal}

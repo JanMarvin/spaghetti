@@ -10,9 +10,15 @@ to_xml <- function(formula, locale = NULL, warn_unknown = TRUE) {
   stopifnot(is.character(formula), length(formula) == 1)
   if (is.null(formula) || is.na(formula) || formula == "") return(formula)
 
-  tokens <- .tokenise(formula)
+  # Identify the local separator (e.g., ";" for German)
+  local_sep <- .get_sep(locale)
+
+  # Tokenise using the local separator
+  tokens <- .tokenise(formula, sep = local_sep)
   out    <- .transform_to_xml(tokens, locale = locale, warn_unknown = warn_unknown)
-  .detokenise(out, prefix_eq = TRUE)
+
+  # OOXML always uses "," as the argument separator in storage
+  .detokenise(out, prefix_eq = TRUE, sep = ",")
 }
 
 #' Convert a OOXML formula to a user-facing Excel formula
@@ -23,9 +29,13 @@ from_xml <- function(formula, locale = NULL) {
   stopifnot(is.character(formula), length(formula) == 1)
   if (is.null(formula) || is.na(formula) || formula == "") return(formula)
 
-  tokens <- .tokenise(formula)
+  # OOXML storage is always comma-separated
+  tokens <- .tokenise(formula, sep = ",")
   out    <- .transform_from_xml(tokens, locale = locale)
-  .detokenise(out, prefix_eq = TRUE)
+
+  # Detokenise using the localized separator (e.g., ";" for German)
+  local_sep <- .get_sep(locale)
+  .detokenise(out, prefix_eq = TRUE, sep = local_sep)
 }
 
 # ── Internal transformation: Excel → OOXML ──────────────────────────────────
@@ -222,4 +232,20 @@ from_xml <- function(formula, locale = NULL) {
 .lambda_scope_comma <- function(scope) {
   # Required to exist; comma tracking is implicit via IDENT registration at depth 1.
   scope
+}
+
+.get_sep <- function(locale) {
+  if (is.null(locale)) return(",")
+
+  # Locales that typically use ";" as the formula argument separator
+  # because they use "," as a decimal separator.
+  semicolon_locales <- c("de", "fr", "it", "es", "pt", "nl", "ru", "da", "fi", "sv")
+
+  lang <- tolower(substring(locale, 1, 2))
+
+  if (lang %in% semicolon_locales) {
+    return(";")
+  }
+
+  ","
 }

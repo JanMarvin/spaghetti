@@ -37,7 +37,7 @@ Pass \code{locale = "de"} (German), \code{"fr"} (French), \code{"es"} (Spanish),
 to \code{\link[=to_xml]{to_xml()}} to translate local names to English before prefixing,
 or to \code{\link[=from_xml]{from_xml()}} to output localised names.
 
-Supported locales: de, fr, es, it, nl, pt, pl, sv.
+Supported locales: de, es, fr, it, nl, pl, pt, sv.
 }
 }
 \references{

@@ -4,12 +4,15 @@
 \alias{.detokenise}
 \title{Reconstruct a formula string from a token list}
 \usage{
-.detokenise(tokens, prefix_eq = TRUE)
+.detokenise(tokens, prefix_eq = TRUE, sep = ",")
 }
 \arguments{
 \item{tokens}{List of token objects.}
 
 \item{prefix_eq}{Logical; prepend '=' if TRUE.}
+
+\item{sep}{The separator used to join arguments (not strictly needed if
+tokens already contain the separator, but useful for validation).}
 }
 \value{
 Character scalar.

@@ -27,9 +27,10 @@ TOKEN_TYPES <- list(
 #' Tokenise an Excel formula string
 #'
 #' @param formula Character scalar, optionally starting with '='.
+#' @param sep The argument separator (e.g., ',' or ';').
 #' @return A list of token objects, each with fields `type` and `val`.
 #' @keywords internal
-.tokenise <- function(formula) {
+.tokenise <- function(formula, sep = ",") {
   # Strip leading '='
   if (startsWith(formula, "=")) formula <- substring(formula, 2)
 
@@ -94,17 +95,20 @@ TOKEN_TYPES <- list(
       next
     }
 
+    # ---- Argument Separator (Dynamic) ----------------------------------
+    if (ch == sep) {
+      emit(TOKEN_TYPES$OTHER, advance())
+      next
+    }
+
     # ---- Identifier (function name, named range, LAMBDA parameter) -----
     if (grepl("[A-Za-z_]", ch) || (ch == "_")) {
       ident <- ""
-      # Consume full identifier: letters, digits, dots, underscores
       while (pos <= n && grepl("[A-Za-z0-9_.!$]", peek())) {
-        # Sheet reference like Sheet1! - include the !
         ident <- paste0(ident, advance())
-        if (endsWith(ident, "!")) break  # stop after '!' – rest is cell ref
+        if (endsWith(ident, "!")) break
       }
 
-      # Peek ahead - is this followed by '('? => FUNC token
       if (peek() == "(") {
         emit(TOKEN_TYPES$FUNC, ident)
       } else {
@@ -113,7 +117,7 @@ TOKEN_TYPES <- list(
       next
     }
 
-    # ---- Numbers (pass through as OTHER) --------------------------------
+    # ---- Numbers -------------------------------------------------------
     if (grepl("[0-9.]", ch)) {
       num <- ""
       while (pos <= n && grepl("[0-9.eE+\\-]", peek())) {
@@ -134,10 +138,15 @@ TOKEN_TYPES <- list(
 #'
 #' @param tokens List of token objects.
 #' @param prefix_eq Logical; prepend '=' if TRUE.
+#' @param sep The separator used to join arguments (not strictly needed if
+#'   tokens already contain the separator, but useful for validation).
 #' @return Character scalar.
 #' @keywords internal
-.detokenise <- function(tokens, prefix_eq = TRUE) {
+.detokenise <- function(tokens, prefix_eq = TRUE, sep = ",") {
+  # If your transformation logic swaps the comma/semicolon tokens
+  # inside the list, this simple collapse works perfectly.
   parts <- vapply(tokens, function(t) t$val, character(1))
   result <- paste(parts, collapse = "")
+
   if (prefix_eq) paste0("=", result) else result
 }

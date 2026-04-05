@@ -4,10 +4,12 @@
 \alias{.tokenise}
 \title{Tokenise an Excel formula string}
 \usage{
-.tokenise(formula)
+.tokenise(formula, sep = ",")
 }
 \arguments{
 \item{formula}{Character scalar, optionally starting with '='.}
+
+\item{sep}{The argument separator (e.g., ',' or ';').}
 }
 \value{
 A list of token objects, each with fields \code{type} and \code{val}.
