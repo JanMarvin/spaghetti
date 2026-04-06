@@ -20,8 +20,7 @@
 # Macro/XLM-only names (ABSREF, ADD.BAR, ACTIVE.CELL, etc.) are included
 # because they appear in the spec and we must not prefix them.
 # ---------------------------------------------------------------------------
-#' @family internal
-LEGACY <- c(
+.spaghetti_env$LEGACY <- c(
   "ABS","ABSREF","ACCRINT","ACCRINTM","ACOS","ACOSH","ACTIVE.CELL",
   "ADD.BAR","ADD.COMMAND","ADD.MENU","ADD.TOOLBAR","ADDRESS","AMORDEGRC",
   "AMORLINC","AND","APP.TITLE","AREAS","ARGUMENT","ASC","ASIN","ASINH",
@@ -102,19 +101,14 @@ LEGACY <- c(
   "XIRR","XNPV","YEAR","YEARFRAC","YIELD","YIELDDISC","YIELDMAT","ZTEST"
 )
 
-.spaghetti_env$LEGACY <- LEGACY
-
 # ---------------------------------------------------------------------------
 # XLWS — _xlfn._xlws. prefix
 # FILTER and SORT are dynamic-array worksheet-scope functions.
 # ANCHORARRAY and SINGLE are synthetic wrappers used by the translator.
 # ---------------------------------------------------------------------------
-#' @family internal
-XLWS <- c(
+.spaghetti_env$XLWS <- c(
   "FILTER","SORT","ANCHORARRAY","SINGLE"
 )
-
-.spaghetti_env$XLWS <- XLWS
 
 # ---------------------------------------------------------------------------
 # XLFN — verbatim from [MS-XLSX] future-function-list production
@@ -123,8 +117,7 @@ XLWS <- c(
 # FORECAST.* group appear outside the _xlfn.() alternation in the spec
 # but are still future functions — listed here without the xlws sub-namespace.
 # ---------------------------------------------------------------------------
-#' @family internal
-XLFN <- c(
+.spaghetti_env$XLFN <- c(
   # -- Verbatim from MS-XLSX future-function-list --
   "AGGREGATE","ACOT","ACOTH","ARABIC","BASE",
   "BETA.DIST","BETA.INV","BINOM.DIST","BINOM.DIST.RANGE","BINOM.INV",
@@ -168,8 +161,6 @@ XLFN <- c(
   "XMATCH","IMAGE","ARRAYTOTEXT","VALUETOTEXT","TEXTJOIN"
 )
 
-.spaghetti_env$XLFN <- XLFN
-
 # ---------------------------------------------------------------------------
 # Lookup helpers
 # ---------------------------------------------------------------------------
@@ -195,4 +186,57 @@ XLFN <- c(
   fn <- sub("^_xlfn\\.",         "", fn)
   fn <- sub("^_xlpm\\.",         "", fn)
   fn
+}
+
+# ---------------------------------------------------------------------------
+# Spell-check helper
+# ---------------------------------------------------------------------------
+
+#' Find the closest known Excel function name(s) to an unknown token.
+#'
+#' Uses generalised edit distance (utils::adist) over the full function
+#' registry. Returns up to `n` suggestions, or character(0) if the closest
+#' match is more than `max_dist` edits away (avoids nonsense suggestions for
+#' completely made-up names).
+#'
+#' @param fn       Unknown function name (uppercase).
+#' @param n        Maximum number of suggestions to return (default 3).
+#' @param max_dist Maximum edit distance to consider a suggestion useful (default 3).
+#' @return Character vector of suggestions, possibly empty.
+#' @keywords internal
+.spell_suggest <- function(fn, n = 3L, max_dist = 3L) {
+  all_known <- c(
+    .spaghetti_env$LEGACY,
+    .spaghetti_env$XLFN,
+    .spaghetti_env$XLWS
+  )
+  # adist is case-sensitive; everything is already upper
+  dists   <- utils::adist(fn, all_known)[1L, ]
+  closest <- sort(dists)[seq_len(min(n, length(dists)))]
+  good    <- closest[closest <= max_dist]
+  if (length(good) == 0L) return(character(0))
+  all_known[dists %in% good][seq_len(min(n, sum(dists <= max_dist)))]
+}
+
+#' Emit a warning for an unknown function name, with spelling suggestions.
+#'
+#' Called from .transform_to_xml() when warn_unknown = TRUE.
+#'
+#' @param fn Unknown function name (uppercase).
+#' @keywords internal
+.warn_unknown_fn <- function(fn) {
+  suggestions <- .spell_suggest(fn)
+  if (length(suggestions) > 0L) {
+    warning(
+      "Unknown Excel function: ", fn,
+      ". Did you mean: ", paste(suggestions, collapse = ", "), "?",
+      call. = FALSE
+    )
+  } else {
+    warning(
+      "Unknown Excel function: ", fn,
+      ". It will be prefixed with _xlfn. but may not work in Excel.",
+      call. = FALSE
+    )
+  }
 }

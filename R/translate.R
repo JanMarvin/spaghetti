@@ -149,6 +149,16 @@ from_xml <- function(formula, locale = NULL) {
       fn_en  <- toupper(.locale_to_english(fn_raw, locale))
       tier   <- .prefix_for(fn_en)
 
+      # Warn if the function name is not in any known registry tier.
+      # .prefix_for() returns "xlfn" as a safe default for unknowns, so we
+      # detect them by checking all three sets explicitly.
+      if (warn_unknown &&
+          !fn_en %in% .spaghetti_env$LEGACY &&
+          !fn_en %in% .spaghetti_env$XLFN  &&
+          !fn_en %in% .spaghetti_env$XLWS) {
+        .warn_unknown_fn(fn_en)
+      }
+
       prefixed <- switch(tier,
                          xlws   = paste0("_xlfn._xlws.", fn_en),
                          xlfn   = paste0("_xlfn.",       fn_en),
