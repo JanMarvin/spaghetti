@@ -37,7 +37,7 @@ Pass \code{locale = "de"} (German), \code{"fr"} (French), \code{"es"} (Spanish),
 to \code{\link[=to_xml]{to_xml()}} to translate local names to English before prefixing,
 or to \code{\link[=from_xml]{from_xml()}} to output localised names.
 
-Supported locales: af, sq, am, ar, hy, as, az, bn, eu, be, bs-Cyrl, bs, bg, my, ca, ckb, chr, zh-CN, zh-TW, hr, cs, da, prs, nl, et, fil, fi, fr, ff, gl, ka, de, el, gu, ha, he, hi, hu, is, ig, id, iu, ga, xh, zu, it, ja, quc, kn, kk, km, rw, sw, kok, ko, ky, lo, lv, lt, lb, mk, ms, mt, mi, mr, mn, ne, nb, nn, or, ps, fa, pl, pt-BR, pt, pa, qu, ro, ru, gd, sr-Cyrl, sr, nso, tn, sd, si, sk, sl, es, sv, tg, ta, tt, te, th, ti, tr, tk, uk, ur, ug, uz-Cyrl, uz, ca-valencia, vi, guc, cy, wo, yo.
+Supported locales: id, af, sq, am-ET, ar, hy, as-IN, az-Latn, bn, eu, be, bs-Cyrl, bs-Latn, bg, my, ca, ckb, chr-Cher, zh-Hans, zh-Hant, hr, cs, da, prs-AF, nl, et, fil-PH, fi, fr, ff, gl, ka, de, el, gu, ha-Latn-NG, he, hi, hu, is, ig-NG, iu-Latn, ga-IE, xh-ZA, zu-ZA, it, ja, qut-GT, kn, kk, km-KH, rw-RW, sw, kok, ko, ky, lo, lv, lt, lb-LU, mk, ms, ml-IN, mt-MT, mi-NZ, mr, mn, ne-NP, nb-NO, nn-NO, or-IN, ps-AF, fa, pl, pt-BR, pt-PT, pa-Arab, pa-Guru, quz, ro, ru, gd, sr-Cyrl, sr-Latn, nso-ZA, tn-ZA, sd, si-LK, sk, sl, es, sv, tg-Cyrl-TJ, ta, tt-Cyrl, te, th, ti, tr, tk-TM, uk, ur, ug, uz-Cyrl, uz-Latn, ca-ES-valencia, vi, guc, cy-GB, wo-SN, yo-NG.
 }
 }
 \references{

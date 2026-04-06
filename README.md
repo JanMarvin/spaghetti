@@ -114,9 +114,9 @@ wb <- wb_add_formula(wb, dims = "C2", x = formulas_lambda, cm = TRUE)
 # Wet-bulb temperature approximation — readable formula using LET
 let <- paste0(
     "=LET(",
-    "  tc, (B%s-32)*5/9,",        # Celsius
-    "  rh, 0.6,",                 # assume 60% relative humidity
-    "  tc * ATAN(0.151977 * (rh * 100 + 8.313659) ^ 0.5)",
+    "tc, (B%s-32)*5/9, ",        # Celsius
+    "rh, 0.6, ",                 # assume 60% relative humidity
+    "tc * ATAN(0.151977 * (rh * 100 + 8.313659) ^ 0.5)",
     ")"
 )
 formulas_let <- to_xml_v(
