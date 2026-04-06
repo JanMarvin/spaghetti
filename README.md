@@ -63,7 +63,6 @@ wb <- wb |>
     dims = "E2",
     x = to_xml("=UNIQUE(SORT(B2:B7))"),
     cm = TRUE
-    # stored as: =_xlfn.UNIQUE(_xlfn._xlws.SORT(B2:B7))
   )
 
 # XLOOKUP: look up total sales for each unique product using the spill ref
@@ -75,7 +74,6 @@ wb <- wb |>
     dims = "F2",
     x = to_xml("=XLOOKUP(E2#, B2:B7, C2:C7, 0, 0)"),
     cm = TRUE
-    # stored as: =_xlfn.XLOOKUP(_xlfn.ANCHORARRAY(E2), B2:B7, C2:C7, 0, 0)
   )
 
 if (interactive()) wb$open()
@@ -101,9 +99,7 @@ wb <- wb_workbook() |>
 # Column header
 wb <- wb_add_data(wb, x = "Temp °C", dims = "C1")
 
-# LAMBDA applied inline to each row with to_xml():
-#   =LAMBDA(f, (f - 32) * 5/9)(B2)  becomes
-#   =_xlfn.LAMBDA(_xlpm.f, (_xlpm.f - 32) * 5/9)(B2)
+# LAMBDA applied inline to each row with to_xml()
 formulas_lambda <- to_xml_v(
   sprintf(
     "=LAMBDA(f, (f - 32) * 5/9)(B%s)",
@@ -132,7 +128,6 @@ wb <- wb_add_data(wb, x = "Wet Bulb °C", dims = "D1") |>
     dims = "D2",
     x = formulas_let,
     cm = TRUE
-    # stored as: =_xlfn.LET(_xlpm.tc, ..., _xlpm.rh, ...)
   )
 
 if (interactive()) wb$open()
