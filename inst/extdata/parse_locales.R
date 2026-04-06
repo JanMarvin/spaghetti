@@ -117,6 +117,8 @@ rm(.f)
   if (!exists(en_clean, envir = EXCEL_FUNCTIONS_SET, inherits = FALSE)) {
     en_clean <- sub("^_XLFN\\.", "", en_clean)
   }
+
+  # Validation: Must be a known Excel function and contain no spaces
   if (!exists(en_clean, envir = EXCEL_FUNCTIONS_SET, inherits = FALSE)) return(NULL)
   if (grepl("\\s", en_clean)) return(NULL)
 
@@ -130,19 +132,20 @@ rm(.f)
   loc_raw <- .extract_term(loc_block)
   if (is.null(loc_raw)) return(NULL)
 
-  # Strip locale-language annotation suffixes ("-Funktion", "-fonction", etc.)
+  # Strip locale-language annotation suffixes and parentheticals.
+  # This handles "-Funktion", " (fonction)", "()", and variations across
+  # the 100+ new locales without needing a hardcoded word list.
   loc_clean <- trimws(gsub(
-    paste0("(?i)[\\s-]*\\(",
-           "funktion|fonction|funzione|functie|",
-           "funkcja|funktioner|función|função",
-           "\\)?\\s*$"),
+    "(?i)[\\s-]*(?:\\(.*?\\)|-?[a-z\u00C0-\u017F]+tion(?:er)?)$",
     "", loc_raw, perl = TRUE
   ))
-  loc_clean <- toupper(trimws(loc_clean))
 
+  loc_clean <- toupper(loc_clean)
+
+  # Final Filtering
   if (is.na(loc_clean) || nchar(loc_clean) < 2) return(NULL)
-  if (loc_clean == en_clean)   return(NULL)   # untranslated — skip
-  if (grepl("\\s", loc_clean)) return(NULL)   # multi-word — not a function name
+  if (loc_clean == en_clean)   return(NULL)   # Skip if untranslated
+  if (grepl("\\s", loc_clean)) return(NULL)   # Skip if it's a phrase, not a name
 
   list(en = en_clean, desc = desc, loc = loc_clean)
 }
@@ -244,40 +247,66 @@ parse_tbx <- function(tbx_path, locale_tag,
 #' @param folder Path to directory containing .tbx files.
 #' @return Named character vector: names = locale codes, values = file paths.
 detect_tbx_files <- function(folder) {
+  # Define the mapping with simplified ASCII keys
   name_to_locale <- c(
-    german      = "de", deutsch    = "de",
-    french      = "fr", francais   = "fr",
-    spanish     = "es", espanol    = "es",
-    italian     = "it", italiano   = "it",
-    dutch       = "nl", nederlands = "nl",
-    portuguese  = "pt", portugues  = "pt",
-    polish      = "pl", polski     = "pl",
-    swedish     = "sv", svenska    = "sv",
-    danish      = "da", dansk      = "da",
-    finnish     = "fi", suomi      = "fi",
-    norwegian   = "no", norsk      = "no",
-    czech       = "cs",
-    hungarian   = "hu",
-    romanian    = "ro",
-    turkish     = "tr"
+    afrikaans = "af", albanian = "sq", amharic = "am", arabic = "ar",
+    armenian = "hy", assamese = "as", azerbaijanilatin = "az", bangla = "bn",
+    basque = "eu", belarusian = "be", bosniancyrillic = "bs-Cyrl",
+    bosnianlatin = "bs", bulgarian = "bg", burmese = "my", catalan = "ca",
+    centralkurdish = "ckb", cherokee = "chr", chinesesimplified = "zh-CN",
+    chinesetraditional = "zh-TW", croatian = "hr", czech = "cs", danish = "da",
+    dari = "prs", dutch = "nl", estonian = "et", filipino = "fil", finnish = "fi",
+    french = "fr", fulah = "ff", galician = "gl", georgian = "ka", german = "de",
+    deutsch = "de", greek = "el", gujarati = "gu", hausalatin = "ha",
+    hebrew = "he", hindi = "hi", hungarian = "hu", icelandic = "is", igbo = "ig",
+    indonesian = "id", inuktitutlatin = "iu", irish = "ga", italian = "it",
+    isixhosa = "xh", isizulu = "zu", japanese = "ja", kiche = "quc",
+    kannada = "kn", kazakh = "kk", khmer = "km", kinyarwanda = "rw",
+    kiswahili = "sw", konkani = "kok", korean = "ko", kyrgyz = "ky", lao = "lo",
+    latvian = "lv", lithuanian = "lt", luxembourgish = "lb", macedonian = "mk",
+    malay = "ms", malayalam = "ml", maltese = "mt", maori = "mi", marathi = "mr",
+    mongolian = "mn", nepali = "ne", norwegianbokmal = "nb",
+    norwegiannynorsk = "nn", odia = "or", pashto = "ps", persian = "fa",
+    polish = "pl", portuguesebrazil = "pt-BR", portugueseportugal = "pt",
+    punjabiarabic = "pa-Arab", punjabigurmukhi = "pa", quechua = "qu",
+    romanian = "ro", russian = "ru", scottishgaelic = "gd",
+    serbiancyrillic = "sr-Cyrl", serbianlatin = "sr",
+    sesothosaleboa = "nso", setswana = "tn", sindhi = "sd", sinhala = "si",
+    slovak = "sk", slovenian = "sl", spanish = "es", swedish = "sv",
+    tajikcyrillic = "tg", tamil = "ta", tatarcyrillic = "tt",
+    telugu = "te", thai = "th", tigrinya = "ti", turkish = "tr", turkmen = "tk",
+    ukrainian = "uk", urdu = "ur", uyghur = "ug", uzbekcyrillic = "uz-Cyrl",
+    uzbeklatin = "uz", valencian = "ca-valencia", vietnamese = "vi",
+    wayuu = "guc", welsh = "cy", wolof = "wo", yoruba = "yo"
   )
 
-  files  <- list.files(folder, pattern = "\\.tbx$", full.names = TRUE,
-                       ignore.case = TRUE)
+  files  <- list.files(folder, pattern = "\\.tbx$", full.names = TRUE, ignore.case = TRUE)
   result <- character(0)
 
+  # Helper to strip everything except basic a-z letters
+  .slugify <- function(x) {
+    x <- tolower(x)
+    x <- gsub("[^a-z]", "", x) # Remove spaces, dashes, accents, and macrons
+    x
+  }
+
   for (f in files) {
-    base  <- tolower(tools::file_path_sans_ext(basename(f)))
-    # Try longest match first (e.g. "portuguese (portugal)")
+    base_name <- tools::file_path_sans_ext(basename(f))
+    slug      <- .slugify(base_name)
+
     match <- NA_character_
+
+    # Try to find the slug in our keys
+    # We check if the key is inside the filename slug (e.g., "maori" in "maori")
     for (nm in names(name_to_locale)) {
-      if (grepl(nm, base, fixed = TRUE)) {
+      if (grepl(nm, slug, fixed = TRUE)) {
         match <- name_to_locale[[nm]]
         break
       }
     }
+
     if (is.na(match)) {
-      warning("Cannot infer locale for: ", basename(f), " — skipping")
+      warning("Cannot infer locale for: ", basename(f), " — slug was: ", slug)
     } else {
       result[[match]] <- f
     }
@@ -286,8 +315,7 @@ detect_tbx_files <- function(folder) {
   if (length(result) == 0)
     stop("No recognised TBX files found in: ", folder)
 
-  message("Detected ", length(result), " locale(s): ",
-          paste(names(result), collapse = ", "))
+  message("Detected ", length(result), " locale(s)")
   result
 }
 
@@ -336,10 +364,27 @@ parse_all_tbx <- function(
     outfile_r   = "data-raw/excel_functions_generated.R",
     workers     = max(1L, parallel::detectCores(logical = FALSE) - 1L),
     locale_tags = list(
-      de = "de", fr = "fr", es = "es", it = "it",
-      nl = "nl", pt = "pt", pl = "pl", sv = "sv",
-      da = "da", fi = "fi", no = "no", cs = "cs",
-      hu = "hu", ro = "ro", tr = "tr"
+      "zh-CN" = "zh-Hans", "zh-TW" = "zh-Hant", "pt-BR" = "pt-BR",
+      "nb" = "nb-NO", "nn" = "nn-NO", "sr-Cyrl" = "sr-Cyrl-RS",
+      "bs-Cyrl" = "bs-Cyrl-BA", "pa-Arab" = "pa-Arab-PK",
+      # For most others, the code matches the tag
+      af="af", sq="sq", am="am", ar="ar", hy="hy", as="as", az="az-Latn",
+      bn="bn", eu="eu", be="be", bs="bs-Latn", bg="bg", my="my", ca="ca",
+      ckb="ku-Arab", chr="chr-Cher", hr="hr", cs="cs", da="da", prs="prs",
+      nl="nl", et="et", fil="fil", fi="fi", fr="fr", ff="ff-Latn", gl="gl",
+      ka="ka", de="de", el="el", gu="gu", ha="ha-Latn", he="he", hi="hi",
+      hu="hu", is="is", ig="ig", id="id", iu="iu-Latn", ga="ga", it="it",
+      xh="xh", zu="zu", ja="ja", quc="quc", kn="kn", kk="kk", km="km",
+      rw="rw", sw="sw", kok="kok", ko="ko", ky="ky", lo="lo", lv="lv",
+      lt="lt", lb="lb", mk="mk", ms="ms", ml="ml", mt="mt", mi="mi",
+      mr="mr", mn="mn", ne="ne", or="or", ps="ps", fa="fa", pl="pl",
+      pt="pt-PT", pa="pa", qu="qu", ro="ro", ru="ru", gd="gd",
+      sr="sr-Latn", nso="nso", tn="tn", sd="sd", si="si", sk="sk",
+      sl="sl", es="es", sv="sv", tg="tg-Cyrl", ta="ta", tt="tt-Cyrl",
+      te="te", th="th", ti="ti", tr="tr", tk="tk-Latn", uk="uk",
+      ur="ur", ug="ug", "uz-Cyrl"="uz-Cyrl", uz="uz-Latn",
+      "ca-valencia"="ca-ES-valencia", vi="vi", guc="guc", cy="cy",
+      wo="wo", yo="yo"
     )
 ) {
 

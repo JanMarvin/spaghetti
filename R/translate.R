@@ -377,9 +377,16 @@ from_xml <- function(formula, locale = NULL) {
 #' @keywords internal
 .get_sep <- function(locale) {
   if (is.null(locale)) return(",")
-  semicolon_locales <- c("de", "fr", "it", "es", "pt", "nl",
-                         "ru", "da", "fi", "sv", "pl", "cs",
-                         "sk", "hu", "ro", "hr", "bg", "el")
+
+  # This list should ideally include most non-English/non-Asian locales
+  # that follow the European decimal comma convention.
+  semicolon_locales <- c(
+    "af", "sq", "am", "ar", "hy", "as", "az", "be", "bs", "bg", "ca", "hr",
+    "cs", "da", "nl", "et", "fi", "fr", "gl", "ka", "de", "el", "hu", "is",
+    "it", "lv", "lt", "lb", "mk", "no", "pl", "pt", "ro", "ru", "sr", "sk",
+    "sl", "es", "sv", "tr", "uk", "vi"
+  )
+
   lang <- tolower(substring(locale, 1, 2))
   if (lang %in% semicolon_locales) ";" else ","
 }

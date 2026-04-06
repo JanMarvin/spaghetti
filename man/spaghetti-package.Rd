@@ -37,7 +37,7 @@ Pass \code{locale = "de"} (German), \code{"fr"} (French), \code{"es"} (Spanish),
 to \code{\link[=to_xml]{to_xml()}} to translate local names to English before prefixing,
 or to \code{\link[=from_xml]{from_xml()}} to output localised names.
 
-Supported locales: cs, da, nl, fi, fr, de, hu, it, no, pl, pt, ro, es, sv, tr.
+Supported locales: af, sq, am, ar, hy, as, az, bn, eu, be, bs-Cyrl, bs, bg, my, ca, ckb, chr, zh-CN, zh-TW, hr, cs, da, prs, nl, et, fil, fi, fr, ff, gl, ka, de, el, gu, ha, he, hi, hu, is, ig, id, iu, ga, xh, zu, it, ja, quc, kn, kk, km, rw, sw, kok, ko, ky, lo, lv, lt, lb, mk, ms, mt, mi, mr, mn, ne, nb, nn, or, ps, fa, pl, pt-BR, pt, pa, qu, ro, ru, gd, sr-Cyrl, sr, nso, tn, sd, si, sk, sl, es, sv, tg, ta, tt, te, th, ti, tr, tk, uk, ur, ug, uz-Cyrl, uz, ca-valencia, vi, guc, cy, wo, yo.
 }
 }
 \references{

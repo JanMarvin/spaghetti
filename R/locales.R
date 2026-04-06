@@ -16,42 +16,58 @@
 
 #' Translate a function name from a locale to English.
 #'
-#' @param fn     Function name string (any case).
-#' @param locale Two-letter locale code or NULL (returns fn unchanged).
+#' @param fn_name Function name string (any case).
+#' @param locale  Two-letter locale code or NULL (returns fn unchanged).
 #' @return English function name, or fn unchanged if no mapping found.
 #' @keywords internal
-.locale_to_english <- function(fn, locale = NULL) {
-  if (is.null(locale)) return(fn)
+.locale_to_english <- function(fn_name, locale) {
+  if (is.null(locale)) return(fn_name)
 
+  # Ensure the data frame exists
   df <- .spaghetti_env$FUNCTIONS
-  if (is.null(df) || !locale %in% names(df)) return(fn)
+  if (is.null(df)) return(fn_name)
 
-  fn_up <- toupper(fn)
-  idx   <- which(toupper(df[[locale]]) == fn_up)
-  if (length(idx) == 0L) return(fn)
-  df$fn[idx[1L]]
+  loc_col <- tolower(substring(locale, 1, 2))
+
+  if (!(loc_col %in% colnames(df))) return(fn_name)
+
+  # Find the English name where the locale column matches the input
+  # We use toupper for a case-insensitive match
+  match_idx <- which(toupper(df[[loc_col]]) == toupper(fn_name))
+
+  if (length(match_idx) > 0) {
+    return(df$fn[match_idx[1]])
+  }
+
+  fn_name
 }
 
 
 #' Translate a function name from English to a locale.
 #'
-#' @param fn     English function name (any case).
+#' @param fn_en  English function name (any case).
 #' @param locale Two-letter locale code or NULL (returns fn unchanged).
 #' @return Localised name, or fn unchanged if no mapping found.
 #' @keywords internal
-.english_to_locale <- function(fn, locale = NULL) {
-  if (is.null(locale)) return(fn)
+.english_to_locale <- function(fn_en, locale) {
+  if (is.null(locale)) return(fn_en)
 
   df <- .spaghetti_env$FUNCTIONS
-  if (is.null(df) || !locale %in% names(df)) return(fn)
+  if (is.null(df)) return(fn_en)
 
-  fn_up <- toupper(fn)
-  idx   <- which(df$fn == fn_up)
-  if (length(idx) == 0L) return(fn)
+  loc_col <- tolower(substring(locale, 1, 2))
+  if (!(loc_col %in% colnames(df))) return(fn_en)
 
-  loc_name <- df[[locale]][idx[1L]]
-  if (is.na(loc_name)) return(fn)
-  loc_name
+  # Find the localized name based on the English 'fn' column
+  match_idx <- which(toupper(df$fn) == toupper(fn_en))
+
+  if (length(match_idx) > 0) {
+    loc_val <- df[[loc_col]][match_idx[1]]
+    # If the translation is NA, fall back to English
+    if (!is.na(loc_val)) return(loc_val)
+  }
+
+  fn_en
 }
 
 

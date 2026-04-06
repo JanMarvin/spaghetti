@@ -7,6 +7,7 @@
 ^pkgdown$
 _pkgdown.yml
 README.Rmd
+^data-raw$
 
 # Configuration files
 ^\.github$

@@ -4,10 +4,10 @@
 \alias{.locale_to_english}
 \title{Translate a function name from a locale to English.}
 \usage{
-.locale_to_english(fn, locale = NULL)
+.locale_to_english(fn_name, locale)
 }
 \arguments{
-\item{fn}{Function name string (any case).}
+\item{fn_name}{Function name string (any case).}
 
 \item{locale}{Two-letter locale code or NULL (returns fn unchanged).}
 }
