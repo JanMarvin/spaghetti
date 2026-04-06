@@ -1,4 +1,6 @@
 
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
 # spaghetti
 
 Bidirectional translator between Excel user-facing formulas (as seen in
@@ -171,22 +173,18 @@ readable <- as.data.frame(lapply(raw_formulas, function(col) {
 # C2: =SEQUENCE(5)
 # D2: =XLOOKUP(C2#, A2:A11, B2:B11)
 print(readable)
-```
+#>              C                             D
+#> 1 =SEQUENCE(5) =XLOOKUP(C2#, A2:A11, B2:B11)
 
-    ##              C                             D
-    ## 1 =SEQUENCE(5) =XLOOKUP(C2#, A2:A11, B2:B11)
-
-``` r
 # Bonus: translate to German for a localised formula audit report
 readable_de <- as.data.frame(lapply(raw_formulas, function(col) {
   ifelse(is_ooxml(col), from_xml(col, locale = "de"), col)
 }))
 # D2: =XVERWEIS(C2#, A2:A11, B2:B11)
 print(readable_de)
+#>             C                              D
+#> 1 =SEQUENZ(5) =XVERWEIS(C2#; A2:A11; B2:B11)
 ```
-
-    ##             C                              D
-    ## 1 =SEQUENZ(5) =XVERWEIS(C2#; A2:A11; B2:B11)
 
 ## Core functions
 
@@ -208,10 +206,16 @@ authored in a localised Excel (e.g. German `SUMMEWENN` instead of
 
 ``` r
 # German formula → OOXML (translates SUMMEWENNS, SVERWEIS, etc.)
-to_xml("=SUMMEWENNS(C2:C10, A2:A10, \"Berlin\")", locale = "de")
-```
+to_xml("=SUMMEWENNS(C2:C10; A2:A10; \"Berlin\")", locale = "de")
+#> [1] "=SUMIFS(C2:C10, A2:A10, \"Berlin\")"
 
-    ## [1] "=SUMIFS(C2:C10, A2:A10, \"Berlin\")"
+round_trip("=SUMMEWENNS(C2:C10; A2:A10; \"Berlin\")", locale = "de", out_locale = "es")
+#> $xml
+#> [1] "=SUMIFS(C2:C10, A2:A10, \"Berlin\")"
+#> 
+#> $locale
+#> [1] "=SUMAR.SI.CONJUNTO(C2:C10; A2:A10; \"Berlin\")"
+```
 
 Supported locales: `de`, `fr`, `es`, `it`, `nl`, `pt`, `pl`, `sv`,
 others …

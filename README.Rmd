@@ -2,6 +2,17 @@
 output: github_document
 ---
 
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
 # spaghetti
 
 Bidirectional translator between Excel user-facing formulas (as seen in the
@@ -202,6 +213,8 @@ in a localised Excel (e.g. German `SUMMEWENN` instead of `SUMIF`), pass the
 ```{r}
 # German formula → OOXML (translates SUMMEWENNS, SVERWEIS, etc.)
 to_xml("=SUMMEWENNS(C2:C10; A2:A10; \"Berlin\")", locale = "de")
+
+round_trip("=SUMMEWENNS(C2:C10; A2:A10; \"Berlin\")", locale = "de", out_locale = "es")
 ```
 
 Supported locales: `de`, `fr`, `es`, `it`, `nl`, `pt`, `pl`, `sv`, others ...
