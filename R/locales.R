@@ -83,7 +83,7 @@
 supported_locales <- function() {
   df <- .spaghetti_env$FUNCTIONS
   if (is.null(df)) return(character(0))
-  setdiff(names(df), c("fn", "description"))
+  setdiff(names(df), c("fn", "description", "term_id"))
 }
 
 

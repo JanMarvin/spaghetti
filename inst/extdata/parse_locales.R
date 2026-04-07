@@ -241,9 +241,8 @@ parse_tbx <- function(tbx_path, locale_tag, locale_col = locale_tag) {
 #' ambiguous between Simplified and Traditional).
 #'
 #' @param folder Path to directory containing .tbx files.
-#' @param peek_bytes Number of bytes to read for locale sniffing (default 8 KB).
 #' @return Named character vector: names = locale codes, values = file paths.
-detect_tbx_files <- function(folder, peek_bytes = 8192L) {
+detect_tbx_files <- function(folder) {
   files <- list.files(folder, pattern = "\\.tbx$", full.names = TRUE,
                       ignore.case = TRUE)
   if (length(files) == 0)
@@ -252,7 +251,7 @@ detect_tbx_files <- function(folder, peek_bytes = 8192L) {
   result <- character(0)
 
   for (f in files) {
-    locale <- .sniff_locale(f, peek_bytes)
+    locale <- .sniff_locale(f)
     if (is.na(locale)) {
       warning("Could not detect locale in: ", basename(f), " — skipping",
               call. = FALSE)
@@ -277,9 +276,9 @@ detect_tbx_files <- function(folder, peek_bytes = 8192L) {
 
 #' Read the first few KB of a TBX file and extract the non-English xml:lang tag.
 #' @keywords internal
-.sniff_locale <- function(path, peek_bytes = 8192L) {
-  xml <- read_xml(paste0(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = ""))
-  entries <- unique(unlist(xml_attr(xml, c("martif", "text", "body", "termEntry", "langSet"))))
+.sniff_locale <- function(path) {
+  xml <- openxlsx2::read_xml(paste0(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = ""))
+  entries <- unique(unlist(openxlsx2::xml_attr(xml, c("martif", "text", "body", "termEntry", "langSet"))))
   setdiff(entries, "en-US")
 }
 
@@ -385,7 +384,7 @@ parse_all_tbx <- function(
   master <- data.frame(
     fn          = EXCEL_FUNCTIONS,
     description = NA_character_,
-    id          = NA_character_,
+    term_id     = NA_character_,
     stringsAsFactors = FALSE
   )
 
@@ -410,9 +409,9 @@ parse_all_tbx <- function(
 
     # Backfill id (take from first locale that provides it)
     if (nrow(lf) > 0 && "term_id" %in% names(lf) && "term_id" %in% names(master)) {
-      id_map <- setNames(lf$id, lf$fn)
-      needs_id <- is.na(master$id) & master$fn %in% names(id_map)
-      master$id[needs_id] <- id_map[master$fn[needs_id]]
+      id_map <- setNames(lf$term_id, lf$fn)
+      needs_id <- is.na(master$term_id) & master$fn %in% names(id_map)
+      master$term_id[needs_id] <- id_map[master$fn[needs_id]]
     }
   }
 

@@ -98,7 +98,9 @@
   "UNREGISTER","UPPER","USDOLLAR",
   "VALUE","VAR","VARA","VARP","VARPA","VDB","VIEW.GET","VLOOKUP","VOLATILE",
   "WEEKDAY","WEEKNUM","WEIBULL","WHILE","WINDOW.TITLE","WINDOWS","WORKDAY",
-  "XIRR","XNPV","YEAR","YEARFRAC","YIELD","YIELDDISC","YIELDMAT","ZTEST"
+  "XIRR","XNPV","YEAR","YEARFRAC","YIELD","YIELDDISC","YIELDMAT","ZTEST",
+  # -- Outside the _xlfn() alternation in spec but still future functions --
+  "ECMA.CEILING","ISO.CEILING","NETWORKDAYS.INTL","WORKDAY.INTL"
 )
 
 # ---------------------------------------------------------------------------
@@ -153,8 +155,8 @@
   "VAR.P","VAR.S","VSTACK",
   "WEBSERVICE","WEIBULL.DIST","WRAPCOLS","WRAPROWS",
   "XLOOKUP","XOR","Z.TEST",
-  # -- Outside the _xlfn() alternation in spec but still future functions --
-  "ECMA.CEILING","ISO.CEILING","NETWORKDAYS.INTL","WORKDAY.INTL",
+  # the FORECAST.* formulas are missing in the TBX files
+  # e.g. in German it should be PROGNOSE.ETS and in French PREVISION.ETS
   "FORECAST.ETS","FORECAST.ETS.CONFINT","FORECAST.ETS.SEASONALITY",
   "FORECAST.LINEAR","FORECAST.ETS.STAT",
   # -- Post-spec 365 additions --
