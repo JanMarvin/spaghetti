@@ -7,13 +7,13 @@
 from_xml(formula, locale = NULL)
 }
 \arguments{
-\item{formula}{Character scalar. The OOXML formula, with or without \code{=}.}
+\item{formula}{Character scalar or vector. OOXML formula(s), with or without \code{=}.}
 
 \item{locale}{Two-letter locale code or NULL. When set, function names are
 translated to the target locale and the locale separator is used in output.}
 }
 \value{
-Character scalar: user-facing formula starting with \code{=}.
+Character scalar or vector: user-facing formula(s) starting with \code{=}.
 }
 \description{
 Convert an OOXML storage formula to user-facing Excel format
@@ -24,4 +24,5 @@ from_xml("=_xlfn.LAMBDA(_xlpm.temp, (5/9) * (_xlpm.temp-32))(100)")
 from_xml("=_xlfn._xlws.FILTER(A1:A10,B1:B10>5)")
 from_xml("=SUM(_xlfn.ANCHORARRAY(A1))")
 from_xml("=_xlfn.SEQUENCE(10)", locale = "de")
+from_xml(c("=_xlfn.SEQUENCE(5)", "=SUM(_xlfn.ANCHORARRAY(A1))"))
 }

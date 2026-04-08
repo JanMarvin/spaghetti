@@ -7,6 +7,13 @@ Bidirectional translator between Excel user-facing formulas (as seen in
 the formula bar) and the OOXML storage format (as found inside `.xlsx`
 XML).
 
+**Key features:** - Automatic prefix injection (`_xlfn.`, `_xlws.`,
+`_xlpm.`) for Excel 365+ functions - Spill operator (`#`) and implicit
+intersection (`@`) translation - LAMBDA and LET parameter scoping with
+`_xlpm.` prefixes - Localised formula support (translate between
+languages) - Vectorized — works with single formulas or character
+vectors - Formula linting with spelling suggestions for typos
+
 ## Why does this exist?
 
 When you write a formula with `openxlsx2::wb_add_formula()`, the string
@@ -31,13 +38,38 @@ handles the translation so you don’t have to remember the rules.
 remotes::install_github("JanMarvin/spaghetti")
 ```
 
+## Quick start
+
+``` r
+library(spaghetti)
+
+# Single formula
+to_xml("=SEQUENCE(10)")
+#> [1] "=_xlfn.SEQUENCE(10)"
+
+# Vector of formulas - same function!
+to_xml(c(
+  "=SEQUENCE(10)",
+  "=FILTER(A1:A10, B1:B10 > 5)",
+  "=SUM(A1#)"
+))
+#> [1] "=_xlfn.SEQUENCE(10)"                    
+#> [2] "=_xlfn._xlws.FILTER(A1:A10, B1:B10 > 5)"
+#> [3] "=SUM(_xlfn.ANCHORARRAY(A1))"
+
+# Round-trip with localisation
+from_xml("=_xlfn.SEQUENCE(10)", locale = "de")
+#> [1] "=SEQUENZ(10)"
+```
+
 ## Usage with openxlsx2
 
 ### Example 1 — Dynamic array formulas (SEQUENCE, UNIQUE, XLOOKUP)
 
 The most common pain point: Excel 365 functions that return spilled
 arrays. Write them in plain formula-bar syntax; `to_xml()` adds the
-required prefixes before handing off to openxlsx2.
+required prefixes before handing off to openxlsx2. Works with both
+single formulas and vectors.
 
 ``` r
 library(spaghetti)
@@ -66,6 +98,7 @@ wb <- wb |>
   )
 
 # XLOOKUP: look up total sales for each unique product using the spill ref
+# to_xml() works with single formulas or vectors
 wb <- wb |>
   wb_add_data(
     dims = "F1", x = "Total Sales"
@@ -100,7 +133,8 @@ wb <- wb_workbook() |>
 wb <- wb_add_data(wb, x = "Temp °C", dims = "C1")
 
 # LAMBDA applied inline to each row with to_xml()
-formulas_lambda <- to_xml_v(
+# to_xml() handles character vectors directly
+formulas_lambda <- to_xml(
   sprintf(
     "=LAMBDA(f, (f - 32) * 5/9)(B%s)",
     2:4
@@ -119,7 +153,7 @@ let <- paste0(
     "tc * ATAN(0.151977 * (rh * 100 + 8.313659) ^ 0.5)",
     ")"
 )
-formulas_let <- to_xml_v(
+formulas_let <- to_xml(
   sprintf(let, 2:4)
 )
 
@@ -185,13 +219,12 @@ print(readable_de)
 
 | Function | Direction | Description |
 |----|----|----|
-| `to_xml(formula, locale)` | Excel → OOXML | Add `_xlfn.`, `_xlws.`, `_xlpm.` prefixes |
-| `from_xml(formula, locale)` | OOXML → Excel | Strip all prefixes |
-| `to_xml_v(formulas)` | vectorised | Apply `to_xml()` to a character vector |
-| `from_xml_v(formulas)` | vectorised | Apply `from_xml()` to a character vector |
+| `to_xml(formula, locale)` | Excel → OOXML | Add `_xlfn.`, `_xlws.`, `_xlpm.` prefixes. Handles both single strings and character vectors. |
+| `from_xml(formula, locale)` | OOXML → Excel | Strip all prefixes. Handles both single strings and character vectors. |
 | `is_ooxml(formula)` | — | Detect whether a formula is already prefixed |
 | `function_prefix(fn)` | — | Check which tier a function name falls into |
 | `supported_locales()` | — | List available locale codes |
+| `check_formula(formula, locale)` | — | Lint formulas for unknown function names with spelling suggestions |
 
 ## Localisation
 
@@ -214,3 +247,28 @@ round_trip("=SUMMEWENNS(C2:C10; A2:A10; \"Berlin\")", locale = "de", out_locale 
 
 Supported locales: `de`, `fr`, `es`, `it`, `nl`, `pt`, `pl`, `sv`,
 others …
+
+## Formula linting
+
+`check_formula()` validates function names and suggests corrections for
+typos:
+
+``` r
+# Catch typos before they become #NAME? errors
+check_formula("=SUIM(A1:A10)")
+#>         formula   fn     suggestion
+#> 1 =SUIM(A1:A10) SUIM DSUM, SIN, SUM
+
+check_formula(c(
+  "=VLOKUP(A1, B:C, 2, 0)",
+  "=FLITER(A1:A10, B1:B10 > 0)"
+))
+#>                       formula     fn               suggestion
+#> 1      =VLOKUP(A1, B:C, 2, 0) VLOKUP HLOOKUP, LOOKUP, VLOOKUP
+#> 2 =FLITER(A1:A10, B1:B10 > 0) FLITER     FILES, FISHER, FIXED
+
+# Works with localised formulas too
+check_formula("=SUMMEWENNS(C2:C10; A2:A10; \"Berlin\")", locale = "de")
+#> No unknown functions found.
+#> No unknown functions found.
+```

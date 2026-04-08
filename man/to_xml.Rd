@@ -7,7 +7,7 @@
 to_xml(formula, locale = NULL, warn_unknown = TRUE)
 }
 \arguments{
-\item{formula}{Character scalar. The Excel formula, with or without \code{=}.}
+\item{formula}{Character scalar or vector. Excel formula(s), with or without \code{=}.}
 
 \item{locale}{Two-letter locale code (\code{"de"}, \code{"fr"}, …) or NULL.
 When set, localised function names are translated to English and the
@@ -16,7 +16,7 @@ locale argument separator (\verb{;} for many European locales) is accepted.}
 \item{warn_unknown}{Logical; warn for unknown function names (default TRUE).}
 }
 \value{
-Character scalar: OOXML formula starting with \code{=}.
+Character scalar or vector: OOXML formula(s) starting with \code{=}.
 }
 \description{
 Convert a user-facing Excel formula to OOXML storage format
@@ -28,4 +28,5 @@ to_xml("=FILTER(A1:A10, B1:B10 > 5)")
 to_xml("=SUM(A1#)")
 to_xml("=LET(tc,(B2-32)*5/9,rh,0.6,tc*ATAN(0.151977*(rh*100+8.313659)^0.5))")
 to_xml("=SUMMEWENN(A1:A10;\"x\";B1:B10)", locale = "de")
+to_xml(c("=SUM(A1:A10)", "=SEQUENCE(5)", "=FILTER(A1:A10, B1:B10 > 0)"))
 }

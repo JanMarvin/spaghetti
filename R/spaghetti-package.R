@@ -18,7 +18,6 @@
 #'
 #' - [to_xml()]: Excel formula bar → OOXML storage
 #' - [from_xml()]: OOXML storage → Excel formula bar
-#' - [to_xml_v()] / [from_xml_v()]: vectorised equivalents
 #' - [function_prefix()]: inspect prefix tier for any function name
 #' - [supported_locales()]: list available locale codes
 #' - [round_trip()]: convert and back-convert for testing

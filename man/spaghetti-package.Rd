@@ -23,7 +23,6 @@ formula bar) and the OOXML storage format (as found in \code{.xlsx} XML source).
 \itemize{
 \item \code{\link[=to_xml]{to_xml()}}: Excel formula bar → OOXML storage
 \item \code{\link[=from_xml]{from_xml()}}: OOXML storage → Excel formula bar
-\item \code{\link[=to_xml_v]{to_xml_v()}} / \code{\link[=from_xml_v]{from_xml_v()}}: vectorised equivalents
 \item \code{\link[=function_prefix]{function_prefix()}}: inspect prefix tier for any function name
 \item \code{\link[=supported_locales]{supported_locales()}}: list available locale codes
 \item \code{\link[=round_trip]{round_trip()}}: convert and back-convert for testing

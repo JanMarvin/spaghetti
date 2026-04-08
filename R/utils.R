@@ -1,38 +1,5 @@
 # R/utils.R
 
-#' Translate a vector of Excel formulas to OOXML storage format
-#'
-#' Vectorised wrapper around [to_xml()].
-#'
-#' @param formulas Character vector of Excel formulas.
-#' @param locale   Locale code, or NULL. Applied to all formulas.
-#' @param warn_unknown Logical.
-#'
-#' @return Character vector of OOXML formulas.
-#' @export
-#' @examples
-#' to_xml_v(c("=SUM(A1:A10)", "=SEQUENCE(5)", "=FILTER(A1:A10, B1:B10 > 0)"))
-to_xml_v <- function(formulas, locale = NULL, warn_unknown = TRUE) {
-  vapply(formulas, to_xml, character(1),
-         locale = locale, warn_unknown = warn_unknown,
-         USE.NAMES = FALSE)
-}
-
-#' Translate a vector of OOXML formulas to user-facing Excel format
-#'
-#' Vectorised wrapper around [from_xml()].
-#'
-#' @param formulas Character vector of OOXML formulas.
-#' @param locale   Target locale code, or NULL.
-#'
-#' @return Character vector of Excel formulas.
-#' @export
-#' @examples
-#' from_xml_v(c("=_xlfn.SEQUENCE(5)", "=SUM(_xlfn.ANCHORARRAY(A1))"))
-from_xml_v <- function(formulas, locale = NULL) {
-  vapply(formulas, from_xml, character(1), locale = locale, USE.NAMES = FALSE)
-}
-
 #' Identify what prefix a function will receive
 #'
 #' Useful for inspecting the registry without running a full translation.

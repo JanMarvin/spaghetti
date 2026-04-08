@@ -152,7 +152,7 @@ test_that("French RECHERCHEV is translated to VLOOKUP", {
 # ── 14. Vectorised wrappers ──────────────────────────────────────────────────
 test_that("to_xml_v handles a vector of formulas", {
   input  <- c("=SUM(A1:A5)", "=SEQUENCE(10)", "=FILTER(A:A,B:B>0)")
-  result <- to_xml_v(input)
+  result <- to_xml(input)
   expect_length(result, 3)
   expect_equal(result[1], "=SUM(A1:A5)")
   expect_match(result[2], "_xlfn.SEQUENCE",    fixed = TRUE)
@@ -161,7 +161,7 @@ test_that("to_xml_v handles a vector of formulas", {
 
 test_that("from_xml_v handles a vector of OOXML formulas", {
   input  <- c("=_xlfn.SEQUENCE(10)", "=_xlfn._xlws.FILTER(A:A,B:B>0)")
-  result <- from_xml_v(input)
+  result <- from_xml(input)
   expect_equal(result[1], "=SEQUENCE(10)")
   expect_equal(result[2], "=FILTER(A:A,B:B>0)")
 })

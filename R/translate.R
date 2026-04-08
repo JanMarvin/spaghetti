@@ -33,13 +33,13 @@
 
 #' Convert a user-facing Excel formula to OOXML storage format
 #'
-#' @param formula Character scalar. The Excel formula, with or without `=`.
+#' @param formula Character scalar or vector. Excel formula(s), with or without `=`.
 #' @param locale  Two-letter locale code (`"de"`, `"fr"`, …) or NULL.
 #'   When set, localised function names are translated to English and the
 #'   locale argument separator (`;` for many European locales) is accepted.
 #' @param warn_unknown Logical; warn for unknown function names (default TRUE).
 #'
-#' @return Character scalar: OOXML formula starting with `=`.
+#' @return Character scalar or vector: OOXML formula(s) starting with `=`.
 #' @export
 #' @examples
 #' to_xml("=SEQUENCE(10)")
@@ -48,26 +48,31 @@
 #' to_xml("=SUM(A1#)")
 #' to_xml("=LET(tc,(B2-32)*5/9,rh,0.6,tc*ATAN(0.151977*(rh*100+8.313659)^0.5))")
 #' to_xml("=SUMMEWENN(A1:A10;\"x\";B1:B10)", locale = "de")
+#' to_xml(c("=SUM(A1:A10)", "=SEQUENCE(5)", "=FILTER(A1:A10, B1:B10 > 0)"))
 to_xml <- function(formula, locale = NULL, warn_unknown = TRUE) {
-  stopifnot(is.character(formula), length(formula) == 1)
-  if (is.null(formula) || is.na(formula) || formula == "") return(formula)
+  stopifnot(is.character(formula))
 
-  local_sep <- .get_sep(locale)
-  tokens    <- .tokenise(formula, sep = local_sep)
-  out       <- .transform_to_xml(tokens, locale = locale,
-                                 warn_unknown = warn_unknown)
-  # OOXML always stores "," regardless of locale
-  .detokenise(out, prefix_eq = TRUE, sep = ",")
+  # Vectorized implementation
+  vapply(formula, function(f) {
+    if (is.null(f) || is.na(f) || f == "") return(f)
+
+    local_sep <- .get_sep(locale)
+    tokens    <- .tokenise(f, sep = local_sep)
+    out       <- .transform_to_xml(tokens, locale = locale,
+                                   warn_unknown = warn_unknown)
+    # OOXML always stores "," regardless of locale
+    .detokenise(out, prefix_eq = TRUE, sep = ",")
+  }, character(1), USE.NAMES = FALSE)
 }
 
 
 #' Convert an OOXML storage formula to user-facing Excel format
 #'
-#' @param formula Character scalar. The OOXML formula, with or without `=`.
+#' @param formula Character scalar or vector. OOXML formula(s), with or without `=`.
 #' @param locale  Two-letter locale code or NULL. When set, function names are
 #'   translated to the target locale and the locale separator is used in output.
 #'
-#' @return Character scalar: user-facing formula starting with `=`.
+#' @return Character scalar or vector: user-facing formula(s) starting with `=`.
 #' @export
 #' @examples
 #' from_xml("=_xlfn.SEQUENCE(10)")
@@ -75,17 +80,22 @@ to_xml <- function(formula, locale = NULL, warn_unknown = TRUE) {
 #' from_xml("=_xlfn._xlws.FILTER(A1:A10,B1:B10>5)")
 #' from_xml("=SUM(_xlfn.ANCHORARRAY(A1))")
 #' from_xml("=_xlfn.SEQUENCE(10)", locale = "de")
+#' from_xml(c("=_xlfn.SEQUENCE(5)", "=SUM(_xlfn.ANCHORARRAY(A1))"))
 from_xml <- function(formula, locale = NULL) {
-  stopifnot(is.character(formula), length(formula) == 1)
-  if (is.null(formula) || is.na(formula) || formula == "") return(formula)
+  stopifnot(is.character(formula))
 
-  # OOXML storage is always comma-separated
-  tokens    <- .tokenise(formula, sep = ",")
-  out       <- .transform_from_xml(tokens, locale = locale)
+  # Vectorized implementation
+  vapply(formula, function(f) {
+    if (is.null(f) || is.na(f) || f == "") return(f)
 
-  # Emit using the locale separator (e.g. ";" for German)
-  local_sep <- .get_sep(locale)
-  .detokenise(out, prefix_eq = TRUE, sep = local_sep)
+    # OOXML storage is always comma-separated
+    tokens    <- .tokenise(f, sep = ",")
+    out       <- .transform_from_xml(tokens, locale = locale)
+
+    # Emit using the locale separator (e.g. ";" for German)
+    local_sep <- .get_sep(locale)
+    .detokenise(out, prefix_eq = TRUE, sep = local_sep)
+  }, character(1), USE.NAMES = FALSE)
 }
 
 
