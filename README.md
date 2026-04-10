@@ -270,5 +270,4 @@ check_formula(c(
 # Works with localised formulas too
 check_formula("=SUMMEWENNS(C2:C10; A2:A10; \"Berlin\")", locale = "de")
 #> No unknown functions found.
-#> No unknown functions found.
 ```
