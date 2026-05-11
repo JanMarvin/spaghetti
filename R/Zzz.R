@@ -1,14 +1,13 @@
+
 # R/zzz.R
 # Package initialisation.
 #
-# Load order (alphabetical):
-#   aaa.R       — creates .spaghetti_env
-#   lexer.R
-#   locales.R   — defines lookup helpers (reads .spaghetti_env$FUNCTIONS)
-#   registry.R  — populates LEGACY / XLFN / XLWS
-#   translate.R
-#   utils.R
-#   zzz.R       — .onLoad() fires last, loads the RDS into FUNCTIONS
+# R sources files in R/ in ASCII order (locale-independent under
+# R CMD INSTALL). Top-level assignments in aaa.R and registry.R run at
+# install/load time before .onLoad() is invoked, so the ordering of
+# function definitions across files is not load-time-critical. .onLoad()
+# itself fires after every R/ file has been sourced.
+
 
 .onLoad <- function(libname, pkgname) {
 

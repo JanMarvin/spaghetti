@@ -37,6 +37,6 @@
 #' - EPPlus wiki: <https://github.com/EPPlusSoftware/EPPlus/wiki/Function-prefixes>
 #' - libxlsxwriter LAMBDA: <https://libxlsxwriter.github.io/lambda_8c-example.html>
 #'
-#' @import utils
+#' @importFrom utils adist
 #' @keywords internal
 "_PACKAGE"
