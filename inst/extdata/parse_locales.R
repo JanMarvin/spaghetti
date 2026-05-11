@@ -31,7 +31,8 @@ library(parallel)
 # ---------------------------------------------------------------------------
 
 EXCEL_FUNCTIONS <- sort(toupper(unique(c(
-  spaghetti:::.spaghetti_env$LEGACY,
+  spaghetti:::.spaghetti_env$LEGACY_WORKSHEET,
+  spaghetti:::.spaghetti_env$LEGACY_XLM,
   spaghetti:::.spaghetti_env$XLFN,
   spaghetti:::.spaghetti_env$XLWS
 ))))

@@ -21,11 +21,8 @@
   if (type == TOKEN_TYPES$STRING)   return("text")
   if (type == TOKEN_TYPES$ANCHOR)   return("operator")   # # spill
   if (type == TOKEN_TYPES$IMPLICIT) return("operator")   # @ implicit
-
-  if (type == TOKEN_TYPES$IDENT) {
-    # Named range or LAMBDA/LET parameter — treat as ref
-    return("ref")
-  }
+  if (type == TOKEN_TYPES$REF)      return("ref")
+  if (type == TOKEN_TYPES$IDENT)    return("ref")        # named range or LAMBDA param
 
   if (type == TOKEN_TYPES$OTHER) {
     if (val == "(")                       return("fun_open")
@@ -36,7 +33,6 @@
     if (val == " ")                       return("operator")   # whitespace op
     if (grepl("^[+*/^&=<>:-]+$", val))   return("operator")
     if (val == "{" || val == "}")         return("operator")   # array literal
-    # Cell refs come through as IDENT or as runs parsed by OTHER
     return("other")
   }
 

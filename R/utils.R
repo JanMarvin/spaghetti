@@ -72,18 +72,13 @@ round_trip <- function(formula, locale = NULL, out_locale = NULL) {
 check_formula <- function(formula, locale = NULL) {
   stopifnot(is.character(formula))
 
-  all_known <- c(
-    .spaghetti_env$LEGACY,
-    .spaghetti_env$XLFN,
-    .spaghetti_env$XLWS
-  )
-
-  issues <- list()
+  all_known <- .spaghetti_env$ALL_KNOWN
+  local_sep <- .get_sep(locale)
+  issues    <- list()
 
   for (f in formula) {
     if (is.na(f) || !nzchar(f)) next
-    local_sep <- .get_sep(locale)
-    tokens    <- .tokenise(f, sep = local_sep)
+    tokens <- .tokenise(f, sep = local_sep)
 
     for (tok in tokens) {
       if (tok$type != TOKEN_TYPES$FUNC) next

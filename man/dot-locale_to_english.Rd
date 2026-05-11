@@ -9,7 +9,7 @@
 \arguments{
 \item{fn_name}{Function name string (any case).}
 
-\item{locale}{Two-letter locale code or NULL (returns fn unchanged).}
+\item{locale}{Locale code or NULL (returns fn unchanged).}
 }
 \value{
 English function name, or fn unchanged if no mapping found.

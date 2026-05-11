@@ -151,30 +151,26 @@ from_xml <- function(formula, locale = NULL) {
         i <- i + 1L
         next
       }
-      # @ref / @ref:ref -> _xlfn.SINGLE(ref)
-      ref_tokens <- list()
-      j <- i + 1L
-      while (j <= n) {
-        t <- tokens[[j]]
-        if (t$type %in% c(TOKEN_TYPES$IDENT, TOKEN_TYPES$REF)) {
-          ref_tokens <- c(ref_tokens, list(t))
-          j <- j + 1L
-          if (j <= n && tokens[[j]]$val == ":") {
-            ref_tokens <- c(ref_tokens, list(tokens[[j]]))
-            j <- j + 1L
-          } else {
-            break
-          }
-        } else {
-          break
-        }
+      # @ref -> _xlfn.SINGLE(ref). REF tokens already cover Sheet!A1,
+      # 'My Sheet'!A1, A1:B10, $A$1, etc. as a single token.
+      if (next_type() == TOKEN_TYPES$REF) {
+        ref_val <- tokens[[i + 1L]]$val
+        push(list(type = TOKEN_TYPES$OTHER,
+                  val  = paste0("_xlfn.SINGLE(", ref_val, ")")))
+        i <- i + 2L
+        next
       }
-      ref_str <- paste(vapply(ref_tokens, `[[`, character(1), "val"),
-                       collapse = "")
-      push(list(type = TOKEN_TYPES$OTHER, val = "_xlfn.SINGLE("))
-      push(list(type = TOKEN_TYPES$OTHER, val = ref_str))
-      push(list(type = TOKEN_TYPES$OTHER, val = ")"))
-      i <- j
+      # @ident -> treat as ref-like (named range etc.)
+      if (next_type() == TOKEN_TYPES$IDENT) {
+        ref_val <- tokens[[i + 1L]]$val
+        push(list(type = TOKEN_TYPES$OTHER,
+                  val  = paste0("_xlfn.SINGLE(", ref_val, ")")))
+        i <- i + 2L
+        next
+      }
+      # Standalone @ that we don't know how to wrap — emit verbatim
+      push(tok)
+      i <- i + 1L
       next
     }
 
@@ -186,11 +182,8 @@ from_xml <- function(formula, locale = NULL) {
 
       # Warn if the function name is not in any known registry tier.
       # .prefix_for() returns "xlfn" as a safe default for unknowns, so we
-      # detect them by checking all three sets explicitly.
-      if (warn_unknown &&
-          !fn_en %in% .spaghetti_env$LEGACY &&
-          !fn_en %in% .spaghetti_env$XLFN  &&
-          !fn_en %in% .spaghetti_env$XLWS) {
+      # detect them via the cached union of all registry tiers.
+      if (warn_unknown && !fn_en %in% .spaghetti_env$ALL_KNOWN) {
         .warn_unknown_fn(fn_en)
       }
 
@@ -251,20 +244,30 @@ from_xml <- function(formula, locale = NULL) {
     # ── Anchor # → _xlfn.ANCHORARRAY(prev_ref) ──────────────────────────
     if (tok$type == TOKEN_TYPES$ANCHOR) {
       if (out_n > 0L) {
-        last_val <- out[[out_n]]$val
-        m <- regmatches(last_val, regexpr("[$A-Za-z]+[$0-9]+$", last_val))
-        if (length(m) == 1L && nchar(m) > 0L) {
-          stripped <- substring(last_val, 1L, nchar(last_val) - nchar(m))
-          if (nchar(stripped) > 0L) {
-            out[[out_n]]$val <- stripped
-            push(list(type = TOKEN_TYPES$OTHER,
-                      val  = paste0("_xlfn.ANCHORARRAY(", m, ")")))
-          } else {
-            out[[out_n]] <- list(type = TOKEN_TYPES$OTHER,
-                                 val  = paste0("_xlfn.ANCHORARRAY(", m, ")"))
-          }
+        last <- out[[out_n]]
+        if (last$type == TOKEN_TYPES$REF) {
+          # Replace the REF token with the wrapped form
+          out[[out_n]] <- list(
+            type = TOKEN_TYPES$OTHER,
+            val  = paste0("_xlfn.ANCHORARRAY(", last$val, ")")
+          )
         } else {
-          push(tok)
+          # Fallback: pull a trailing cell-ref shape from the last token's
+          # value (handles e.g. an IDENT that contained a ref-like suffix).
+          m <- regmatches(last$val, regexpr("[$A-Za-z]+[$0-9]+$", last$val))
+          if (length(m) == 1L && nchar(m) > 0L) {
+            stripped <- substring(last$val, 1L, nchar(last$val) - nchar(m))
+            if (nchar(stripped) > 0L) {
+              out[[out_n]]$val <- stripped
+              push(list(type = TOKEN_TYPES$OTHER,
+                        val  = paste0("_xlfn.ANCHORARRAY(", m, ")")))
+            } else {
+              out[[out_n]] <- list(type = TOKEN_TYPES$OTHER,
+                                   val  = paste0("_xlfn.ANCHORARRAY(", m, ")"))
+            }
+          } else {
+            push(tok)
+          }
         }
       } else {
         push(tok)
@@ -364,11 +367,12 @@ from_xml <- function(formula, locale = NULL) {
       next
     }
 
-    # IDENT: strip _xlpm. prefix, optionally localise
+    # IDENT: strip _xlpm. prefix only. Do NOT localise — IDENT tokens are
+    # user-bound names (LAMBDA params, LET variables, named ranges) that
+    # happen to be valid identifiers; passing them through .english_to_locale
+    # would mistranslate any name that collides with a function name.
     if (tok$type == TOKEN_TYPES$IDENT) {
-      fn_clean <- .strip_prefix(tok$val)
-      fn_out   <- if (!is.null(locale)) .english_to_locale(fn_clean, locale) else fn_clean
-      push(list(type = TOKEN_TYPES$IDENT, val = fn_out))
+      push(list(type = TOKEN_TYPES$IDENT, val = .strip_prefix(tok$val)))
       i <- i + 1L
       next
     }
@@ -415,23 +419,14 @@ from_xml <- function(formula, locale = NULL) {
 
 #' Return the formula argument separator for a given locale.
 #'
-#' Locales that use "," as their decimal separator use ";" in formulas.
+#' Locales using "," as their decimal separator use ";" in formulas. The
+#' list lives in `.spaghetti_env$SEMICOLON_LOCALES` (see R/aaa.R).
 #'
-#' @param locale Two-letter locale code or NULL.
+#' @param locale Locale code or NULL.
 #' @return ";" or ","
 #' @keywords internal
 .get_sep <- function(locale) {
   if (is.null(locale)) return(",")
-
-  # This list should ideally include most non-English/non-Asian locales
-  # that follow the European decimal comma convention.
-  semicolon_locales <- c(
-    "af", "sq", "am", "ar", "hy", "as", "az", "be", "bs", "bg", "ca", "hr",
-    "cs", "da", "nl", "et", "fi", "fr", "gl", "ka", "de", "el", "hu", "is",
-    "it", "lv", "lt", "lb", "mk", "no", "pl", "pt", "ro", "ru", "sr", "sk",
-    "sl", "es", "sv", "tr", "uk", "vi"
-  )
-
   lang <- tolower(substring(locale, 1, 2))
-  if (lang %in% semicolon_locales) ";" else ","
+  if (lang %in% .spaghetti_env$SEMICOLON_LOCALES) ";" else ","
 }

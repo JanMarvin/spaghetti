@@ -29,7 +29,7 @@ test_that("xlex identifies fun_open and fun_close tokens", {
 test_that("xlex nests arguments inside function (depth)", {
   df <- xlex("=SUM(A1:A10)", print = FALSE)
   fn_depth  <- df$depth[df$label == "function"][1L]
-  arg_depth <- df$depth[df$val == "A1"][1L]
+  arg_depth <- df$depth[df$val == "A1:A10"][1L]
   # Arguments should be deeper than the function itself
   expect_true(arg_depth > fn_depth)
 })

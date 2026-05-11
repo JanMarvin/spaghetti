@@ -275,12 +275,16 @@ test_that("is_ooxml recognises bare _xlws. (hypothetical) tokens", {
 
 # ── 25. Registry: no name appears in more than one tier ──────────────────────
 test_that("registry tiers are pairwise disjoint", {
-  L <- spaghetti:::.spaghetti_env$LEGACY
-  F <- spaghetti:::.spaghetti_env$XLFN
-  W <- spaghetti:::.spaghetti_env$XLWS
-  expect_length(intersect(L, F), 0L)
-  expect_length(intersect(L, W), 0L)
-  expect_length(intersect(F, W), 0L)
+  Lw <- spaghetti:::.spaghetti_env$LEGACY_WORKSHEET
+  Lx <- spaghetti:::.spaghetti_env$LEGACY_XLM
+  F  <- spaghetti:::.spaghetti_env$XLFN
+  W  <- spaghetti:::.spaghetti_env$XLWS
+  expect_length(intersect(Lw, Lx), 0L)
+  expect_length(intersect(Lw, F),  0L)
+  expect_length(intersect(Lw, W),  0L)
+  expect_length(intersect(Lx, F),  0L)
+  expect_length(intersect(Lx, W),  0L)
+  expect_length(intersect(F,  W),  0L)
 })
 
 # ── 26. round_trip() returns named list with 'xml' and 'formula' ─────────────
@@ -288,4 +292,59 @@ test_that("round_trip() exposes formula element (not 'locale' / not 'excel')", {
   rt <- round_trip("=SEQUENCE(5)")
   expect_named(rt, c("xml", "formula"))
   expect_equal(rt$formula, "=SEQUENCE(5)")
+})
+
+# ── 27. Sheet-qualified anchor: Sheet1!A1# ───────────────────────────────────
+test_that("sheet-qualified spill anchor wraps the full ref", {
+  expect_equal(
+    to_xml("=SUM(Sheet1!A1#)"),
+    "=SUM(_xlfn.ANCHORARRAY(Sheet1!A1))"
+  )
+  expect_equal(
+    from_xml("=SUM(_xlfn.ANCHORARRAY(Sheet1!A1))"),
+    "=SUM(Sheet1!A1#)"
+  )
+})
+
+test_that("quoted sheet-name anchor wraps the full ref", {
+  expect_equal(
+    to_xml("=SUM('My Sheet'!A1#)"),
+    "=SUM(_xlfn.ANCHORARRAY('My Sheet'!A1))"
+  )
+})
+
+# ── 28. Sheet-qualified implicit intersection: @Sheet1!A1:A10 ────────────────
+test_that("sheet-qualified @ wraps the full ref in SINGLE", {
+  expect_equal(
+    to_xml("=@Sheet1!A1:A10"),
+    "=_xlfn.SINGLE(Sheet1!A1:A10)"
+  )
+})
+
+# ── 29. Multi-segment locale codes resolve correctly ─────────────────────────
+test_that("multi-segment locale 'de-DE' falls back to 'de'", {
+  result <- to_xml("=SUMME(A1:A10)", locale = "de-DE")
+  expect_match(result, "=SUM", fixed = TRUE)
+  expect_false(grepl("SUMME", result, fixed = TRUE))
+})
+
+# ── 30. IDENT bindings (LAMBDA params) are not locale-translated ─────────────
+test_that("LAMBDA param named 'sum' is not translated to a locale function", {
+  # _xlpm.sum should round-trip as 'sum', not as 'SUMME' (German) etc.
+  # German output uses ';' as the argument separator.
+  result <- from_xml("=_xlfn.LAMBDA(_xlpm.sum, _xlpm.sum + 1)(5)", locale = "de")
+  expect_match(result, "LAMBDA(sum;", fixed = TRUE)
+  expect_false(grepl("SUMME", result, fixed = TRUE))
+})
+
+# ── 31. Lexer emits REF tokens for cell references ───────────────────────────
+test_that("lexer classifies bare cell refs as REF, not IDENT", {
+  toks <- spaghetti:::.tokenise("A1+B2")
+  types <- vapply(toks, function(t) t$type, character(1))
+  expect_true("REF" %in% types)
+  # Sheet-qualified ref is a single REF token
+  toks2 <- spaghetti:::.tokenise("Sheet1!A1:B10")
+  expect_equal(length(toks2), 1L)
+  expect_equal(toks2[[1]]$type, "REF")
+  expect_equal(toks2[[1]]$val,  "Sheet1!A1:B10")
 })

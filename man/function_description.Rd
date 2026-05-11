@@ -2,7 +2,7 @@
 % Please edit documentation in R/locales.R
 \name{function_description}
 \alias{function_description}
-\title{Look up the English description for an Excel function.}
+\title{Look up the English description for a function.}
 \usage{
 function_description(fn)
 }
@@ -13,7 +13,7 @@ function_description(fn)
 Character vector of descriptions (NA where not found).
 }
 \description{
-Look up the English description for an Excel function.
+Look up the English description for a function.
 }
 \examples{
 function_description(c("SUM", "XLOOKUP", "LAMBDA"))

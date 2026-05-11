@@ -7,12 +7,13 @@
 .get_sep(locale)
 }
 \arguments{
-\item{locale}{Two-letter locale code or NULL.}
+\item{locale}{Locale code or NULL.}
 }
 \value{
 ";" or ","
 }
 \description{
-Locales that use "," as their decimal separator use ";" in formulas.
+Locales using "," as their decimal separator use ";" in formulas. The
+list lives in \code{.spaghetti_env$SEMICOLON_LOCALES} (see R/aaa.R).
 }
 \keyword{internal}

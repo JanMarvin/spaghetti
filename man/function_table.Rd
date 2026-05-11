@@ -10,7 +10,7 @@ function_table()
 data.frame
 }
 \description{
-One row per Excel function, columns: fn, description, and one column per
+One row per known function, columns: fn, description, and one column per
 supported locale containing the localised function name (NA if not
 translated).
 }

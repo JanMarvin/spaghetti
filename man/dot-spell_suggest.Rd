@@ -11,15 +11,19 @@
 
 \item{n}{Maximum number of suggestions to return (default 3).}
 
-\item{max_dist}{Maximum edit distance to consider a suggestion useful (default 3).}
+\item{max_dist}{Maximum edit distance to consider a useful suggestion (default 3).}
 }
 \value{
 Character vector of suggestions, possibly empty.
 }
 \description{
-Uses generalised edit distance (utils::adist) over the full function
-registry. Returns up to \code{n} suggestions, or character(0) if the closest
-match is more than \code{max_dist} edits away (avoids nonsense suggestions for
-completely made-up names).
+Uses generalised edit distance (utils::adist) over the worksheet-function
+registry (LEGACY_WORKSHEET ∪ XLFN ∪ XLWS). XLM macro names are excluded
+from suggestions since user typos in worksheet contexts are almost
+never typos of XLM names.
+}
+\details{
+Returns up to \code{n} suggestions, or character(0) if the closest match is
+more than \code{max_dist} edits away.
 }
 \keyword{internal}
