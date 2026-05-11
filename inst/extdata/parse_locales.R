@@ -470,8 +470,13 @@ parse_all_tbx <- function(
 # 6.  Run
 # ---------------------------------------------------------------------------
 
-# Auto-detect all TBX files in the folder:
-result <- parse_all_tbx("~/Downloads/MicrosoftTermCollection")
+# Auto-detect all TBX files in the folder.
+# Guarded so `source()`ing the file just defines the functions; run by either
+# calling parse_all_tbx() directly, or executing this script as the top-level
+# command (Rscript inst/extdata/parse_locales.R).
+if (sys.nframe() == 0L && interactive() == FALSE) {
+  result <- parse_all_tbx("~/Downloads/MicrosoftTermCollection")
+}
 
 # Or supply paths explicitly:
 # result <- parse_all_tbx(tbx_files = list(
