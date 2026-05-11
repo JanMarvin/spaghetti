@@ -90,7 +90,7 @@
   "SUM","SUMIF","SUMIFS","SUMPRODUCT","SUMSQ","SUMX2MY2","SUMX2PY2","SUMXMY2",
   "SWITCH","SYD",
   "T","TAN","TANH","TBILLEQ","TBILLPRICE","TBILLYIELD","TDIST","TERMINATE",
-  "TEXT","TEXT.BOX","TEXTJOIN","TEXTREF",
+  "TEXT","TEXT.BOX","TEXTREF",
   "THAIDAYOFWEEK","THAIDIGIT","THAIMONTHOFYEAR","THAINUMSOUND",
   "THAINUMSTRING","THAISTRINGLENGTH","THAIYEAR",
   "TIME","TIMEVALUE","TINV","TODAY","TRANSPOSE","TREND","TRIM","TRIMMEAN",
@@ -212,12 +212,12 @@
     .spaghetti_env$XLFN,
     .spaghetti_env$XLWS
   )
-  # adist is case-sensitive; everything is already upper
-  dists   <- utils::adist(fn, all_known)[1L, ]
-  closest <- sort(dists)[seq_len(min(n, length(dists)))]
-  good    <- closest[closest <= max_dist]
-  if (length(good) == 0L) return(character(0))
-  all_known[dists %in% good][seq_len(min(n, sum(dists <= max_dist)))]
+  dists <- utils::adist(fn, all_known)[1L, ]
+  ord   <- order(dists)
+  keep  <- ord[seq_len(min(n, length(ord)))]
+  keep  <- keep[dists[keep] <= max_dist]
+  if (length(keep) == 0L) return(character(0))
+  all_known[keep]
 }
 
 #' Emit a warning for an unknown function name, with spelling suggestions.
