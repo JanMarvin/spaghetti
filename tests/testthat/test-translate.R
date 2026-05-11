@@ -348,3 +348,165 @@ test_that("lexer classifies bare cell refs as REF, not IDENT", {
   expect_equal(toks2[[1]]$type, "REF")
   expect_equal(toks2[[1]]$val,  "Sheet1!A1:B10")
 })
+
+# ── 32. Error literals ───────────────────────────────────────────────────────
+test_that("error literals round-trip without being interpreted as anchors", {
+  for (lit in c("#REF!", "#N/A", "#DIV/0!", "#VALUE!", "#NAME?", "#NUM!",
+                "#NULL!", "#GETTING_DATA", "#SPILL!", "#CALC!", "#BLOCKED!",
+                "#FIELD!")) {
+    expect_equal(to_xml(paste0("=", lit)),       paste0("=", lit), info = lit)
+    expect_equal(from_xml(paste0("=", lit)),     paste0("=", lit), info = lit)
+  }
+})
+
+test_that("error literals inside a function call survive translation", {
+  expect_equal(
+    to_xml("=IFERROR(VLOOKUP(A1,B:C,2,0),#N/A)"),
+    "=IFERROR(VLOOKUP(A1,B:C,2,0),#N/A)"
+  )
+})
+
+test_that("an isolated # still parses as the spill-anchor operator", {
+  expect_equal(to_xml("=A1#"), "=_xlfn.ANCHORARRAY(A1)")
+  # # followed by non-uppercase: still anchor
+  expect_equal(to_xml("=A1#+B1#"),
+               "=_xlfn.ANCHORARRAY(A1)+_xlfn.ANCHORARRAY(B1)")
+})
+
+# ── 33. External workbook refs ───────────────────────────────────────────────
+test_that("external workbook references are one REF token", {
+  toks <- spaghetti:::.tokenise("[Book1]Sheet1!A1")
+  expect_equal(length(toks), 1L)
+  expect_equal(toks[[1]]$type, "REF")
+  expect_equal(toks[[1]]$val,  "[Book1]Sheet1!A1")
+
+  # Indexed form [1]Sheet1!A1
+  toks2 <- spaghetti:::.tokenise("[1]Sheet1!A1")
+  expect_equal(toks2[[1]]$val,  "[1]Sheet1!A1")
+
+  # Quoted form '[Book1]Sheet1'!A1
+  toks3 <- spaghetti:::.tokenise("'[Book1.xlsx]Sheet1'!A1")
+  expect_equal(toks3[[1]]$val, "'[Book1.xlsx]Sheet1'!A1")
+})
+
+test_that("external workbook refs survive to_xml/from_xml round-trip", {
+  expect_equal(
+    to_xml("=SUM([Book1]Sheet1!A1:A10)"),
+    "=SUM([Book1]Sheet1!A1:A10)"
+  )
+})
+
+# ── 34. 3D refs ──────────────────────────────────────────────────────────────
+test_that("3D references (Sheet1:Sheet5!A1) are one REF token", {
+  toks <- spaghetti:::.tokenise("Sheet1:Sheet5!A1")
+  expect_equal(length(toks), 1L)
+  expect_equal(toks[[1]]$type, "REF")
+  expect_equal(toks[[1]]$val,  "Sheet1:Sheet5!A1")
+})
+
+test_that("3D references round-trip through to_xml/from_xml", {
+  expect_equal(
+    to_xml("=SUM(Sheet1:Sheet5!A1)"),
+    "=SUM(Sheet1:Sheet5!A1)"
+  )
+})
+
+# ── 35. Structured table refs ────────────────────────────────────────────────
+test_that("structured table refs are one REF token", {
+  for (s in c("Table1[Col1]",
+              "Table1[#Headers]",
+              "Table1[[#All],[Col1]]",
+              "Table1[@Col1]",
+              "Table1[@[Col1]:[Col2]]")) {
+    toks <- spaghetti:::.tokenise(s)
+    expect_equal(length(toks), 1L, info = s)
+    expect_equal(toks[[1]]$type, "REF", info = s)
+    expect_equal(toks[[1]]$val,  s,     info = s)
+  }
+})
+
+test_that("table refs survive @ wrapping", {
+  expect_equal(
+    to_xml("=@Table1[Col1]"),
+    "=_xlfn.SINGLE(Table1[Col1])"
+  )
+})
+
+test_that("table refs survive # spill-anchor", {
+  expect_equal(
+    to_xml("=Table1[Col1]#"),
+    "=_xlfn.ANCHORARRAY(Table1[Col1])"
+  )
+})
+
+# ── 36. Array literals ───────────────────────────────────────────────────────
+test_that("array literals are one OTHER token with internals shielded", {
+  toks <- spaghetti:::.tokenise("{1,2;3,4}")
+  expect_equal(length(toks), 1L)
+  expect_equal(toks[[1]]$val, "{1,2;3,4}")
+})
+
+test_that("array column/row separators survive locale conversion", {
+  # German source: outer separator is ';', inner array still uses ,/;
+  expect_equal(
+    to_xml("=SUM({1,2;3,4};A1)", locale = "de"),
+    "=SUM({1,2;3,4},A1)"
+  )
+  # Round-trip German -> OOXML -> German. Function names are also
+  # localised on the way back, so SUM -> SUMME.
+  rt <- round_trip("=SUM({1,2;3,4};A1)", locale = "de", out_locale = "de")
+  expect_equal(rt$xml,     "=SUM({1,2;3,4},A1)")
+  expect_equal(rt$formula, "=SUMME({1,2;3,4};A1)")
+})
+
+test_that("array literals can contain string elements with separators", {
+  expect_equal(
+    to_xml('=COUNTIF(A1:A10,{"a","b","c"})'),
+    '=COUNTIF(A1:A10,{"a","b","c"})'
+  )
+})
+
+# ── 37. Nested SINGLE around a function call (from_xml) ──────────────────────
+test_that("from_xml recursively transforms inside SINGLE(...)", {
+  # Inside the SINGLE wrapper, the inner _xlfn.SEQUENCE prefix must be stripped
+  expect_equal(
+    from_xml("=_xlfn.SINGLE(_xlfn.SEQUENCE(10))"),
+    "=@SEQUENCE(10)"
+  )
+})
+
+test_that("from_xml recursively transforms inside ANCHORARRAY(...)", {
+  expect_equal(
+    from_xml("=_xlfn.ANCHORARRAY(_xlfn.SEQUENCE(10))"),
+    "=SEQUENCE(10)#"
+  )
+})
+
+# ── 38. Whitespace inside refs is collapsed ──────────────────────────────────
+test_that("A1 : B10 with surrounding whitespace is one REF token", {
+  toks <- spaghetti:::.tokenise("A1 : B10")
+  refs <- vapply(toks, function(t) t$type, character(1)) == "REF"
+  expect_equal(sum(refs), 1L)
+  expect_equal(toks[[which(refs)]]$val, "A1:B10")
+})
+
+test_that("whitespace-in-ref survives anchor and SINGLE wrapping", {
+  expect_equal(to_xml("=A1 : B10 #"), "=_xlfn.ANCHORARRAY(A1:B10)")
+  expect_equal(to_xml("=@A1 : B10"),  "=_xlfn.SINGLE(A1:B10)")
+  expect_equal(to_xml("=SUM(A1 : B10)"), "=SUM(A1:B10)")
+})
+
+test_that("intersection space between two refs is NOT merged", {
+  # `A1:B10 C5:D15` is the range-intersection operator — leave the space.
+  toks <- spaghetti:::.tokenise("A1:B10 C5:D15")
+  types <- vapply(toks, function(t) t$type, character(1))
+  expect_equal(types, c("REF", "OTHER", "REF"))
+  expect_equal(toks[[2]]$val, " ")
+})
+
+test_that("intersection survives to_xml round-trip", {
+  expect_equal(
+    to_xml("=SUM(A1:B10 A5:D5)"),
+    "=SUM(A1:B10 A5:D5)"
+  )
+})

@@ -28,11 +28,13 @@
     if (val == "(")                       return("fun_open")
     if (val == ")")                       return("fun_close")
     if (val %in% c(",", ";", sep))        return("separator")
+    if (startsWith(val, "#"))             return("error")        # #REF!, #N/A, etc.
+    if (startsWith(val, "{") && endsWith(val, "}"))
+      return("array")
     if (grepl("^[0-9]+(\\.[0-9]*)?([eE][+-]?[0-9]+)?$", val))
       return("number")
     if (val == " ")                       return("operator")   # whitespace op
     if (grepl("^[+*/^&=<>:-]+$", val))   return("operator")
-    if (val == "{" || val == "}")         return("operator")   # array literal
     return("other")
   }
 
@@ -41,43 +43,49 @@
 
 # ── Tree builder ─────────────────────────────────────────────────────────────
 
+# TRUE iff toks[[i]] is a whitespace-only OTHER token sandwiched between
+# two REF tokens — that's the formula intersection operator.
+.xlex_is_intersection <- function(toks, i) {
+  if (i <= 1L || i >= length(toks)) return(FALSE)
+  t <- toks[[i]]
+  if (t$type != TOKEN_TYPES$OTHER) return(FALSE)
+  if (!grepl("^\\s+$", t$val, perl = TRUE)) return(FALSE)
+  prev_t <- toks[[i - 1L]]
+  next_t <- toks[[i + 1L]]
+  prev_t$type == TOKEN_TYPES$REF && next_t$type == TOKEN_TYPES$REF
+}
+
 #' Build a nested tree from a flat token list.
 #'
 #' Each node is a list(label, val, children).
 #' FUNC tokens own everything up to and including their matching ')'.
 #' @keywords internal
 .build_tree <- function(tokens, sep) {
-  # We'll use a recursive descent over the flat token vector.
-  # Returns list(nodes = <tree list>, consumed = <int>)
   .parse_level <- function(toks, start, stop_at_close = FALSE) {
     nodes <- list()
     i     <- start
 
     while (i <= length(toks)) {
       tok   <- toks[[i]]
-      label <- .xlex_label(tok, sep)
+      label <- if (.xlex_is_intersection(toks, i)) "intersection"
+      else .xlex_label(tok, sep)
 
       if (label == "fun_close" && stop_at_close) {
-        # Return without consuming the ')' — caller will add it
         return(list(nodes = nodes, next_i = i))
       }
 
       if (label == "function") {
-        # Consume the function name, then descend into its argument list
         fn_node <- list(label = "function", val = tok$val, children = list())
         i <- i + 1L
 
-        # Expect '(' next
         if (i <= length(toks) && .xlex_label(toks[[i]], sep) == "fun_open") {
           open_node <- list(label = "fun_open", val = toks[[i]]$val,
                             children = list())
           i <- i + 1L
 
-          # Recurse for the argument tokens
           inner <- .parse_level(toks, i, stop_at_close = TRUE)
           i     <- inner$next_i
 
-          # Consume the matching ')'
           close_node <- NULL
           if (i <= length(toks) && .xlex_label(toks[[i]], sep) == "fun_close") {
             close_node <- list(label = "fun_close", val = toks[[i]]$val,
@@ -94,7 +102,6 @@
         next
       }
 
-      # Leaf node
       node  <- list(label = label, val = tok$val, children = list())
       nodes <- c(nodes, list(node))
       i     <- i + 1L

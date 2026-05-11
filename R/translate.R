@@ -132,6 +132,26 @@ from_xml <- function(formula, locale = NULL) {
   next_val <- function() if (i + 1L <= n) tokens[[i + 1L]]$val else ""
   next_type <- function() if (i + 1L <= n) tokens[[i + 1L]]$type else ""
 
+  # Helpers for skipping whitespace OTHER tokens around operators that
+  # bind to a ref. Excel/spreadsheet UIs are tolerant of spaces like
+  # `A1 #` and `@ A1` — these should bind as if there was no space.
+  is_ws <- function(tok) {
+    tok$type == TOKEN_TYPES$OTHER && grepl("^\\s+$", tok$val, perl = TRUE)
+  }
+  # Index of the next non-whitespace token in `tokens` starting from k,
+  # or NA if none.
+  skip_ws_forward <- function(k) {
+    while (k <= n && is_ws(tokens[[k]])) k <- k + 1L
+    if (k > n) NA_integer_ else k
+  }
+  # Index of the last non-whitespace token in `out` ending at out_n,
+  # or NA if none.
+  skip_ws_backward_out <- function() {
+    k <- out_n
+    while (k >= 1L && is_ws(out[[k]])) k <- k - 1L
+    if (k < 1L) NA_integer_ else k
+  }
+
   while (i <= n) {
     tok <- tokens[[i]]
 
@@ -144,28 +164,33 @@ from_xml <- function(formula, locale = NULL) {
 
     # ── Implicit intersection @ ─────────────────────────────────────────
     if (tok$type == TOKEN_TYPES$IMPLICIT) {
+      # Find the next significant token, skipping any whitespace between
+      # @ and its target.
+      k <- skip_ws_forward(i + 1L)
+      tgt_type <- if (is.na(k)) "" else tokens[[k]]$type
+
       # @FUNC(...) -> _xlfn.SINGLE(FUNC(...))
-      if (next_type() == TOKEN_TYPES$FUNC) {
+      if (tgt_type == TOKEN_TYPES$FUNC) {
         push(list(type = TOKEN_TYPES$OTHER, val = "_xlfn.SINGLE("))
         pending_singles <- c(pending_singles, paren_depth)
-        i <- i + 1L
+        i <- k
         next
       }
       # @ref -> _xlfn.SINGLE(ref). REF tokens already cover Sheet!A1,
       # 'My Sheet'!A1, A1:B10, $A$1, etc. as a single token.
-      if (next_type() == TOKEN_TYPES$REF) {
-        ref_val <- tokens[[i + 1L]]$val
+      if (tgt_type == TOKEN_TYPES$REF) {
+        ref_val <- tokens[[k]]$val
         push(list(type = TOKEN_TYPES$OTHER,
                   val  = paste0("_xlfn.SINGLE(", ref_val, ")")))
-        i <- i + 2L
+        i <- k + 1L
         next
       }
       # @ident -> treat as ref-like (named range etc.)
-      if (next_type() == TOKEN_TYPES$IDENT) {
-        ref_val <- tokens[[i + 1L]]$val
+      if (tgt_type == TOKEN_TYPES$IDENT) {
+        ref_val <- tokens[[k]]$val
         push(list(type = TOKEN_TYPES$OTHER,
                   val  = paste0("_xlfn.SINGLE(", ref_val, ")")))
-        i <- i + 2L
+        i <- k + 1L
         next
       }
       # Standalone @ that we don't know how to wrap — emit verbatim
@@ -243,10 +268,17 @@ from_xml <- function(formula, locale = NULL) {
 
     # ── Anchor # → _xlfn.ANCHORARRAY(prev_ref) ──────────────────────────
     if (tok$type == TOKEN_TYPES$ANCHOR) {
-      if (out_n > 0L) {
-        last <- out[[out_n]]
+      # Look back past any whitespace OTHER tokens (e.g. user typed
+      # "A1 #" with a space).
+      ref_idx <- skip_ws_backward_out()
+      if (!is.na(ref_idx)) {
+        last <- out[[ref_idx]]
         if (last$type == TOKEN_TYPES$REF) {
-          # Replace the REF token with the wrapped form
+          # Drop any whitespace tokens that sat between the REF and #.
+          if (ref_idx < out_n) {
+            # Keep only out[1..ref_idx]; the slot will be overwritten.
+            out_n <- ref_idx
+          }
           out[[out_n]] <- list(
             type = TOKEN_TYPES$OTHER,
             val  = paste0("_xlfn.ANCHORARRAY(", last$val, ")")
@@ -257,6 +289,7 @@ from_xml <- function(formula, locale = NULL) {
           m <- regmatches(last$val, regexpr("[$A-Za-z]+[$0-9]+$", last$val))
           if (length(m) == 1L && nchar(m) > 0L) {
             stripped <- substring(last$val, 1L, nchar(last$val) - nchar(m))
+            if (ref_idx < out_n) out_n <- ref_idx
             if (nchar(stripped) > 0L) {
               out[[out_n]]$val <- stripped
               push(list(type = TOKEN_TYPES$OTHER,
@@ -344,19 +377,35 @@ from_xml <- function(formula, locale = NULL) {
       fn_up    <- toupper(fn_clean)
 
       if (fn_up == "ANCHORARRAY" || fn_up == "SINGLE") {
-        j <- i + 1L
-        if (j <= n && tokens[[j]]$val == "(") {
-          j <- j + 1L
-          ref_parts <- character(0)
-          while (j <= n && tokens[[j]]$val != ")") {
-            ref_parts <- c(ref_parts, tokens[[j]]$val)
-            j <- j + 1L
+        # Find the inner token range between matching parens.
+        if (i + 1L <= n && tokens[[i + 1L]]$val == "(") {
+          inner_start <- i + 2L
+          j           <- inner_start
+          depth       <- 1L
+          while (j <= n && depth > 0L) {
+            v <- tokens[[j]]$val
+            if (v == "(") depth <- depth + 1L
+            else if (v == ")") depth <- depth - 1L
+            if (depth > 0L) j <- j + 1L
           }
-          if (j <= n) j <- j + 1L
-          ref_str <- paste(ref_parts, collapse = "")
-          new_val <- if (fn_up == "ANCHORARRAY") paste0(ref_str, "#") else paste0("@", ref_str)
+          inner_end <- j - 1L
+
+          # Recursively transform the inner tokens so nested prefixes get
+          # stripped/localised correctly.
+          inner_toks <- if (inner_start <= inner_end) {
+            .transform_from_xml(tokens[inner_start:inner_end],
+                                locale = locale, local_sep = local_sep)
+          } else {
+            list()
+          }
+          inner_val <- paste(vapply(inner_toks, `[[`, character(1), "val"),
+                             collapse = "")
+          new_val <- if (fn_up == "ANCHORARRAY")
+            paste0(inner_val, "#")
+          else
+            paste0("@", inner_val)
           push(list(type = TOKEN_TYPES$OTHER, val = new_val))
-          i <- j
+          i <- j + 1L
           next
         }
       }

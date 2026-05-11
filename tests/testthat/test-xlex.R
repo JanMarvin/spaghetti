@@ -84,3 +84,18 @@ test_that("xlex handles implicit intersection @ operator", {
   df <- xlex("=@A1:A10", print = FALSE)
   expect_true(any(df$label == "operator" & df$val == "@"))
 })
+
+test_that("xlex labels intersection (space between two refs) distinctly", {
+  df <- xlex("=SUM(A1:B10 A5:D5)", print = FALSE)
+  expect_true(any(df$label == "intersection"))
+})
+
+test_that("xlex labels error literals as 'error'", {
+  df <- xlex("=IFERROR(VLOOKUP(A1,B:C,2,0),#N/A)", print = FALSE)
+  expect_true(any(df$label == "error" & df$val == "#N/A"))
+})
+
+test_that("xlex labels array literals as 'array'", {
+  df <- xlex("=SUM({1,2;3,4})", print = FALSE)
+  expect_true(any(df$label == "array"))
+})

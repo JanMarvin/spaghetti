@@ -1,0 +1,123 @@
+# spaghetti 0.2.0
+
+## Breaking changes
+
+* `round_trip()` now returns a list with elements `xml` and `formula`.
+  The previous element name was `excel` (and earlier `locale`, which was a
+  bug). Update any code reading `rt$excel` or `rt$locale` to `rt$formula`.
+
+* The `LEGACY` function registry has been split into `LEGACY_WORKSHEET`
+  (modern worksheet functions) and `LEGACY_XLM` (Excel 4 macro language).
+  External code accessing `spaghetti:::.spaghetti_env$LEGACY` must use one
+  of the new names. `function_prefix()` continues to return `"legacy"` for
+  both.
+
+* The R/Zzz.R file was renamed to R/zzz.R to match standard convention
+  and fix incorrect documentation about ASCII source order.
+
+* IDENT tokens (LAMBDA / LET parameters, named ranges) are no longer
+  passed through the locale lookup in `from_xml()`. The previous behaviour
+  would mis-translate a LAMBDA parameter named e.g. `sum` to the local
+  function name for SUM. If you relied on locale-translation of bare
+  identifiers, this is a breaking change.
+
+## New features
+
+* Lexer now distinguishes a dedicated `REF` token type from `IDENT`.
+  Cell references — including sheet-qualified, quoted-sheet, 3D,
+  external-workbook, and structured table refs — are emitted as a single
+  REF token:
+
+  * `Sheet1!A1`, `'My Sheet'!A1`
+  * `Sheet1:Sheet5!A1` (3D range across sheets)
+  * `[Book1]Sheet1!A1`, `[1]Sheet1!A1`, `'[Book1.xlsx]Sheet1'!A1`
+  * `Table1[Col]`, `Table1[#Headers]`, `Table1[@Col]`,
+    `Table1[[#All],[Col]]`
+
+* `@FUNC(...)` now wraps as `_xlfn.SINGLE(FUNC(...))` instead of dropping
+  the function call.
+
+* Excel error literals (`#REF!`, `#N/A`, `#DIV/0!`, `#VALUE!`, `#NAME?`,
+  `#NUM!`, `#NULL!`, `#GETTING_DATA`, `#SPILL!`, `#CALC!`, `#BLOCKED!`,
+  `#FIELD!`, `#PYTHON!`, etc.) lex as opaque values rather than being
+  fragmented as `#` (anchor) + identifier.
+
+* Array literals `{...}` are lexed as a single opaque token. Internal
+  column (`,`) and row (`;`) separators are no longer normalised by the
+  outer locale-separator pass, so `=SUM({1,2;3,4};A1)` round-trips
+  correctly under German locale.
+
+* User-typed whitespace inside ranges (`A1 : B10`) is normalised to the
+  compact form (`A1:B10`) in `to_xml()` output. The range-intersection
+  operator (a space between two refs, `A1:B10 C5:D15`) is preserved.
+
+* Locale codes can now be multi-segment (`de-DE`, `pt-BR`, `zh-Hans`,
+  `zh-Hans-CN`). Lookup tries the full string first then falls back
+  segment-by-segment (`zh-Hans-CN → zh-Hans → zh`).
+
+* `xlex()` now labels three new token kinds explicitly: `error` for error
+  literals, `array` for `{...}` literals, and `intersection` for a space
+  between two refs.
+
+## Bug fixes
+
+* LAMBDA / LET parameter detection no longer prefixes named ranges that
+  appear in the body. The rule is: at depth==1 of the innermost
+  LAMBDA/LET, an IDENT is a bound name iff its next token is `,`.
+
+* Number lexer no longer consumes trailing `+`/`-` as part of a number.
+  `1+2` and similar arithmetic now tokenises correctly. Scientific
+  notation `1e-3`, `1.5E+2` still works.
+
+* `is_ooxml()` regex now detects `_xlws.` in addition to `_xlfn.` and
+  `_xlpm.`.
+
+* `.spell_suggest()` orders results by edit distance instead of returning
+  matches in registry order.
+
+* `TEXTJOIN` is no longer duplicated across the LEGACY and XLFN tiers.
+
+* `function_table()` no longer leaks the internal `term_id` column.
+
+* `from_xml()` recursively transforms the inner tokens of
+  `_xlfn.ANCHORARRAY(...)` and `_xlfn.SINGLE(...)`, so nested prefixed
+  function calls inside the wrapper get their prefixes stripped and their
+  names localised correctly.
+
+* `parse_locales.R` no longer auto-executes its bottom-of-file call when
+  the script is `source()`d. Wrap it in `if (sys.nframe() == 0L && ...)`.
+
+## Performance
+
+* O(n²) list-growth eliminated from `.tokenise()`, `.transform_to_xml()`,
+  and `.transform_from_xml()` by preallocating output lists and using
+  amortised-growth indexing.
+
+* Lexer switched from per-character `paste0(s, c)` accumulation to
+  substring extraction, reducing character-level allocation in long
+  formulas.
+
+* Locale lookups in `.locale_to_english()` / `.english_to_locale()` are
+  now O(1) hashed environment lookups instead of linear column scans
+  with per-call `toupper()`.
+
+* `.spell_suggest()` and `check_formula()` use a cached `ALL_KNOWN`
+  vector built once at `.onLoad()`.
+
+* `.get_sep()` in vapply hot loops is now lifted once outside the loop
+  body in `to_xml()`, `from_xml()`, and `check_formula()`.
+
+## Internal
+
+* Shared semicolon-locales list moved from a hardcoded constant in
+  `translate.R` into `.spaghetti_env$SEMICOLON_LOCALES`.
+
+* Per-locale lookup environments (`LOC_TO_EN`, `EN_TO_LOC`) built once at
+  `.onLoad()` from the function table.
+
+* `Imports: utils` narrowed to `importFrom(utils, adist)`.
+
+
+# spaghetti 0.1.0
+
+Initial release.
