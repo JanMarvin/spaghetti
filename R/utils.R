@@ -16,7 +16,7 @@ function_prefix <- function(fn) {
 #' Check whether a formula is already in OOXML storage format
 #'
 #' A formula is considered "already OOXML" if it contains at least one
-#' `_xlfn.` or `_xlpm.` token.
+#' `_xlfn.`, `_xlws.`, or `_xlpm.` token.
 #'
 #' @param formula Character scalar.
 #' @return Logical.
@@ -25,7 +25,7 @@ function_prefix <- function(fn) {
 #' is_ooxml("=_xlfn.SEQUENCE(10)")   # TRUE
 #' is_ooxml("=SEQUENCE(10)")          # FALSE
 is_ooxml <- function(formula) {
-  grepl("_xlfn\\.|_xlpm\\.", formula, fixed = FALSE)
+  grepl("_xlfn\\.|_xlws\\.|_xlpm\\.", formula)
 }
 
 #' Round-trip a formula through OOXML and back
@@ -42,8 +42,8 @@ is_ooxml <- function(formula) {
 #' round_trip("=LAMBDA(x, x * 2)(5)")
 round_trip <- function(formula, locale = NULL, out_locale = NULL) {
   xml   <- to_xml(formula, locale = locale)
-  locale <- from_xml(xml,   locale = out_locale)
-  list(xml = xml, locale = locale)
+  excel <- from_xml(xml,   locale = out_locale)
+  list(xml = xml, excel = excel)
 }
 
 #' Check a formula for unknown function names
