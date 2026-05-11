@@ -37,7 +37,8 @@ TOKEN_TYPES <- list(
   chars <- strsplit(formula, "")[[1]]
   n     <- length(chars)
   pos   <- 1L
-  tokens <- list()
+  tokens   <- vector("list", n)
+  n_tokens <- 0L
 
   peek <- function(offset = 0L) {
     p <- pos + offset
@@ -52,7 +53,11 @@ TOKEN_TYPES <- list(
   }
 
   emit <- function(type, val) {
-    tokens[[length(tokens) + 1L]] <<- list(type = type, val = val)
+    n_tokens <<- n_tokens + 1L
+    if (n_tokens > length(tokens)) {
+      length(tokens) <<- length(tokens) * 2L
+    }
+    tokens[[n_tokens]] <<- list(type = type, val = val)
   }
 
   while (pos <= n) {
@@ -102,7 +107,7 @@ TOKEN_TYPES <- list(
     }
 
     # ---- Identifier (function name, named range, LAMBDA parameter) -----
-    if (grepl("[A-Za-z_]", ch) || (ch == "_")) {
+    if (grepl("[A-Za-z_]", ch)) {
       ident <- ""
       while (pos <= n && grepl("[A-Za-z0-9_.!$]", peek())) {
         ident <- paste0(ident, advance())
@@ -118,10 +123,27 @@ TOKEN_TYPES <- list(
     }
 
     # ---- Numbers -------------------------------------------------------
+    # Digits, one optional decimal point, optional exponent with sign.
+    # +/- is only valid immediately after e/E; otherwise it's an operator
+    # and must not be eaten into the number token.
     if (grepl("[0-9.]", ch)) {
-      num <- ""
-      while (pos <= n && grepl("[0-9.eE+\\-]", peek())) {
-        num <- paste0(num, advance())
+      num     <- ""
+      prev_ch <- ""
+      while (pos <= n) {
+        p <- peek()
+        if (grepl("[0-9.]", p)) {
+          num     <- paste0(num, advance())
+          prev_ch <- p
+        } else if (p == "e" || p == "E") {
+          num     <- paste0(num, advance())
+          prev_ch <- p
+        } else if ((p == "+" || p == "-") &&
+                   (prev_ch == "e" || prev_ch == "E")) {
+          num     <- paste0(num, advance())
+          prev_ch <- p
+        } else {
+          break
+        }
       }
       emit(TOKEN_TYPES$OTHER, num)
       next
@@ -131,20 +153,20 @@ TOKEN_TYPES <- list(
     emit(TOKEN_TYPES$OTHER, advance())
   }
 
+  if (n_tokens < length(tokens)) length(tokens) <- n_tokens
   tokens
 }
 
 #' Reconstruct a formula string from a token list
 #'
+#' Separator tokens (`,`/`;`) are already present in the token stream and
+#' have been swapped by the transform passes, so this is a simple concat.
+#'
 #' @param tokens List of token objects.
 #' @param prefix_eq Logical; prepend '=' if TRUE.
-#' @param sep The separator used to join arguments (not strictly needed if
-#'   tokens already contain the separator, but useful for validation).
 #' @return Character scalar.
 #' @keywords internal
-.detokenise <- function(tokens, prefix_eq = TRUE, sep = ",") {
-  # If your transformation logic swaps the comma/semicolon tokens
-  # inside the list, this simple collapse works perfectly.
+.detokenise <- function(tokens, prefix_eq = TRUE) {
   parts <- vapply(tokens, function(t) t$val, character(1))
   result <- paste(parts, collapse = "")
 
