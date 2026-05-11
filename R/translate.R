@@ -52,16 +52,16 @@
 to_xml <- function(formula, locale = NULL, warn_unknown = TRUE) {
   stopifnot(is.character(formula))
 
-  # Vectorized implementation
-  vapply(formula, function(f) {
-    if (is.null(f) || is.na(f) || f == "") return(f)
+  local_sep <- .get_sep(locale)
 
-    local_sep <- .get_sep(locale)
-    tokens    <- .tokenise(f, sep = local_sep)
-    out       <- .transform_to_xml(tokens, locale = locale,
-                                   warn_unknown = warn_unknown)
+  vapply(formula, function(f) {
+    if (is.na(f) || !nzchar(f)) return(f)
+
+    tokens <- .tokenise(f, sep = local_sep)
+    out    <- .transform_to_xml(tokens, locale = locale,
+                                warn_unknown = warn_unknown)
     # OOXML always stores "," regardless of locale
-    .detokenise(out, prefix_eq = TRUE, sep = ",")
+    .detokenise(out, prefix_eq = TRUE)
   }, character(1), USE.NAMES = FALSE)
 }
 
@@ -84,17 +84,16 @@ to_xml <- function(formula, locale = NULL, warn_unknown = TRUE) {
 from_xml <- function(formula, locale = NULL) {
   stopifnot(is.character(formula))
 
-  # Vectorized implementation
+  local_sep <- .get_sep(locale)
+
   vapply(formula, function(f) {
-    if (is.null(f) || is.na(f) || f == "") return(f)
+    if (is.na(f) || !nzchar(f)) return(f)
 
     # OOXML storage is always comma-separated
-    tokens    <- .tokenise(f, sep = ",")
-    out       <- .transform_from_xml(tokens, locale = locale)
-
-    # Emit using the locale separator (e.g. ";" for German)
-    local_sep <- .get_sep(locale)
-    .detokenise(out, prefix_eq = TRUE, sep = local_sep)
+    tokens <- .tokenise(f, sep = ",")
+    out    <- .transform_from_xml(tokens, locale = locale,
+                                  local_sep = local_sep)
+    .detokenise(out, prefix_eq = TRUE)
   }, character(1), USE.NAMES = FALSE)
 }
 
@@ -104,8 +103,23 @@ from_xml <- function(formula, locale = NULL) {
 #' @keywords internal
 .transform_to_xml <- function(tokens, locale, warn_unknown) {
   n   <- length(tokens)
-  out <- list()
+  out <- vector("list", n)
+  out_n <- 0L
   i   <- 1L
+
+  push <- function(tok) {
+    out_n <<- out_n + 1L
+    if (out_n > length(out)) length(out) <<- length(out) * 2L
+    out[[out_n]] <<- tok
+  }
+
+  # Absolute paren depth of the *input* token stream we've consumed so far.
+  paren_depth <- 0L
+
+  # Pending closures for `@FUNC(...)` -> `_xlfn.SINGLE(FUNC(...))`.
+  # Each entry is the paren_depth at which the matching extra ')' should fire
+  # (i.e. the depth the input was at when we saw `@`).
+  pending_singles <- integer(0)
 
   # Scope stack for LAMBDA and LET.
   # Each entry: list(depth = int, params = char_vec)
@@ -113,18 +127,30 @@ from_xml <- function(formula, locale = NULL) {
   # params : original-case names of all bound identifiers seen so far
   lambda_scope <- list()
 
+  # Peek the value of the next token, or "" if none.
+  next_val <- function() if (i + 1L <= n) tokens[[i + 1L]]$val else ""
+  next_type <- function() if (i + 1L <= n) tokens[[i + 1L]]$type else ""
+
   while (i <= n) {
     tok <- tokens[[i]]
 
     # ── String literals pass through unchanged ──────────────────────────
     if (tok$type == TOKEN_TYPES$STRING) {
-      out <- c(out, list(tok))
-      i   <- i + 1L
+      push(tok)
+      i <- i + 1L
       next
     }
 
-    # ── Implicit intersection @ → _xlfn.SINGLE( ... ) ──────────────────
+    # ── Implicit intersection @ ─────────────────────────────────────────
     if (tok$type == TOKEN_TYPES$IMPLICIT) {
+      # @FUNC(...) -> _xlfn.SINGLE(FUNC(...))
+      if (next_type() == TOKEN_TYPES$FUNC) {
+        push(list(type = TOKEN_TYPES$OTHER, val = "_xlfn.SINGLE("))
+        pending_singles <- c(pending_singles, paren_depth)
+        i <- i + 1L
+        next
+      }
+      # @ref / @ref:ref -> _xlfn.SINGLE(ref)
       ref_tokens <- list()
       j <- i + 1L
       while (j <= n) {
@@ -144,11 +170,9 @@ from_xml <- function(formula, locale = NULL) {
       }
       ref_str <- paste(vapply(ref_tokens, `[[`, character(1), "val"),
                        collapse = "")
-      out <- c(out, list(
-        list(type = TOKEN_TYPES$OTHER, val = "_xlfn.SINGLE("),
-        list(type = TOKEN_TYPES$OTHER, val = ref_str),
-        list(type = TOKEN_TYPES$OTHER, val = ")")
-      ))
+      push(list(type = TOKEN_TYPES$OTHER, val = "_xlfn.SINGLE("))
+      push(list(type = TOKEN_TYPES$OTHER, val = ref_str))
+      push(list(type = TOKEN_TYPES$OTHER, val = ")"))
       i <- j
       next
     }
@@ -175,7 +199,7 @@ from_xml <- function(formula, locale = NULL) {
                          legacy = fn_en
       )
 
-      out <- c(out, list(list(type = TOKEN_TYPES$FUNC, val = prefixed)))
+      push(list(type = TOKEN_TYPES$FUNC, val = prefixed))
 
       # Both LAMBDA and LET bind identifier names that need _xlpm. prefixes.
       # Push a new scope entry; depth starts at 0 and becomes 1 when '(' fires.
@@ -189,33 +213,35 @@ from_xml <- function(formula, locale = NULL) {
 
     # ── IDENT: LAMBDA/LET parameter or variable name ─────────────────────
     if (tok$type == TOKEN_TYPES$IDENT) {
-      raw_name <- .strip_prefix(tok$val)   # preserve original case
+      raw_name <- .strip_prefix(tok$val)
 
-      # Check if already registered as a bound name from any enclosing scope
-      is_known_param <- any(vapply(
-        lambda_scope,
-        function(s) raw_name %in% s$params,
-        logical(1)
-      ))
+      # Already registered as a bound name in some enclosing scope?
+      is_known_param <- FALSE
+      for (s in lambda_scope) {
+        if (raw_name %in% s$params) { is_known_param <- TRUE; break }
+      }
 
-      # If at depth == 1 of the innermost LAMBDA/LET, register this as a
-      # new bound name (original case preserved)
-      if (length(lambda_scope) > 0) {
+      # Register as a new bound name only if at depth==1 of the innermost
+      # LAMBDA/LET *and* the next token is "," — that's the invariant
+      # distinguishing param/name slots from body expressions:
+      #   LAMBDA(x, y, body)  -> x,y followed by "," ; body never is
+      #   LET(a, 1, b, 2, expr) -> names followed by "," ; expr never is
+      if (length(lambda_scope) > 0L) {
         top_idx <- length(lambda_scope)
-        if (lambda_scope[[top_idx]]$depth == 1L) {
-          lambda_scope[[top_idx]]$params <-
-            unique(c(lambda_scope[[top_idx]]$params, raw_name))
+        if (lambda_scope[[top_idx]]$depth == 1L && next_val() == ",") {
+          if (!(raw_name %in% lambda_scope[[top_idx]]$params)) {
+            lambda_scope[[top_idx]]$params <-
+              c(lambda_scope[[top_idx]]$params, raw_name)
+          }
           is_known_param <- TRUE
         }
       }
 
       if (is_known_param) {
-        # _xlpm. prefix + preserve original case
-        out <- c(out, list(list(type = TOKEN_TYPES$IDENT,
-                                val  = paste0("_xlpm.", raw_name))))
+        push(list(type = TOKEN_TYPES$IDENT,
+                  val  = paste0("_xlpm.", raw_name)))
       } else {
-        # Regular identifier (named range etc.) — pass through as-is
-        out <- c(out, list(list(type = TOKEN_TYPES$IDENT, val = raw_name)))
+        push(list(type = TOKEN_TYPES$IDENT, val = raw_name))
       }
       i <- i + 1L
       next
@@ -223,27 +249,24 @@ from_xml <- function(formula, locale = NULL) {
 
     # ── Anchor # → _xlfn.ANCHORARRAY(prev_ref) ──────────────────────────
     if (tok$type == TOKEN_TYPES$ANCHOR) {
-      if (length(out) > 0) {
-        last_tok <- out[[length(out)]]
-        last_val <- last_tok$val
-        m <- regmatches(last_val,
-                        regexpr("[$A-Za-z]+[$0-9]+$", last_val))
-        if (length(m) == 1 && nchar(m) > 0) {
-          stripped <- substring(last_val, 1, nchar(last_val) - nchar(m))
-          if (nchar(stripped) > 0) {
-            out[[length(out)]]$val <- stripped
+      if (out_n > 0L) {
+        last_val <- out[[out_n]]$val
+        m <- regmatches(last_val, regexpr("[$A-Za-z]+[$0-9]+$", last_val))
+        if (length(m) == 1L && nchar(m) > 0L) {
+          stripped <- substring(last_val, 1L, nchar(last_val) - nchar(m))
+          if (nchar(stripped) > 0L) {
+            out[[out_n]]$val <- stripped
+            push(list(type = TOKEN_TYPES$OTHER,
+                      val  = paste0("_xlfn.ANCHORARRAY(", m, ")")))
           } else {
-            out <- out[-length(out)]
+            out[[out_n]] <- list(type = TOKEN_TYPES$OTHER,
+                                 val  = paste0("_xlfn.ANCHORARRAY(", m, ")"))
           }
-          out <- c(out, list(list(
-            type = TOKEN_TYPES$OTHER,
-            val  = paste0("_xlfn.ANCHORARRAY(", m, ")")
-          )))
         } else {
-          out <- c(out, list(tok))
+          push(tok)
         }
       } else {
-        out <- c(out, list(tok))
+        push(tok)
       }
       i <- i + 1L
       next
@@ -254,21 +277,34 @@ from_xml <- function(formula, locale = NULL) {
       val <- tok$val
       if (val == "(") {
         lambda_scope <- .lambda_scope_open(lambda_scope)
+        paren_depth  <- paren_depth + 1L
       } else if (val == ")") {
         lambda_scope <- .lambda_scope_close(lambda_scope)
+        paren_depth  <- paren_depth - 1L
       }
       # Normalise any separator token to "," for OOXML storage
       if (val == "," || val == ";") {
-        out <- c(out, list(list(type = TOKEN_TYPES$OTHER, val = ",")))
-        i   <- i + 1L
+        push(list(type = TOKEN_TYPES$OTHER, val = ","))
+        i <- i + 1L
         next
       }
+      push(tok)
+      # If this ')' just closed a pending @FUNC SINGLE wrapper, emit an
+      # extra ')' to close _xlfn.SINGLE.
+      if (val == ")" && length(pending_singles) > 0L &&
+          pending_singles[length(pending_singles)] == paren_depth) {
+        pending_singles <- pending_singles[-length(pending_singles)]
+        push(list(type = TOKEN_TYPES$OTHER, val = ")"))
+      }
+      i <- i + 1L
+      next
     }
 
-    out <- c(out, list(tok))
-    i   <- i + 1L
+    push(tok)
+    i <- i + 1L
   }
 
+  if (out_n < length(out)) length(out) <- out_n
   out
 }
 
@@ -276,67 +312,54 @@ from_xml <- function(formula, locale = NULL) {
 # ── Internal transformation: OOXML → Excel ───────────────────────────────────
 
 #' @keywords internal
-.transform_from_xml <- function(tokens, locale) {
+.transform_from_xml <- function(tokens, locale, local_sep = .get_sep(locale)) {
   n         <- length(tokens)
-  out       <- list()
+  out       <- vector("list", n)
+  out_n     <- 0L
   i         <- 1L
-  local_sep <- .get_sep(locale)
+
+  push <- function(tok) {
+    out_n <<- out_n + 1L
+    if (out_n > length(out)) length(out) <<- length(out) * 2L
+    out[[out_n]] <<- tok
+  }
 
   while (i <= n) {
     tok <- tokens[[i]]
 
     # String literals pass through
     if (tok$type == TOKEN_TYPES$STRING) {
-      out <- c(out, list(tok))
-      i   <- i + 1L
+      push(tok)
+      i <- i + 1L
       next
     }
 
     # FUNC: strip prefix, handle ANCHORARRAY/SINGLE unwrapping, then localise
     if (tok$type == TOKEN_TYPES$FUNC) {
       fn_clean <- .strip_prefix(tok$val)
+      fn_up    <- toupper(fn_clean)
 
-      if (toupper(fn_clean) == "ANCHORARRAY") {
+      if (fn_up == "ANCHORARRAY" || fn_up == "SINGLE") {
         j <- i + 1L
         if (j <= n && tokens[[j]]$val == "(") {
           j <- j + 1L
-          ref_parts <- list()
+          ref_parts <- character(0)
           while (j <= n && tokens[[j]]$val != ")") {
-            ref_parts <- c(ref_parts, list(tokens[[j]]))
+            ref_parts <- c(ref_parts, tokens[[j]]$val)
             j <- j + 1L
           }
           if (j <= n) j <- j + 1L
-          ref_str <- paste(vapply(ref_parts, `[[`, character(1), "val"),
-                           collapse = "")
-          out <- c(out, list(list(type = TOKEN_TYPES$OTHER,
-                                  val  = paste0(ref_str, "#"))))
-          i <- j
-          next
-        }
-      }
-
-      if (toupper(fn_clean) == "SINGLE") {
-        j <- i + 1L
-        if (j <= n && tokens[[j]]$val == "(") {
-          j <- j + 1L
-          ref_parts <- list()
-          while (j <= n && tokens[[j]]$val != ")") {
-            ref_parts <- c(ref_parts, list(tokens[[j]]))
-            j <- j + 1L
-          }
-          if (j <= n) j <- j + 1L
-          ref_str <- paste(vapply(ref_parts, `[[`, character(1), "val"),
-                           collapse = "")
-          out <- c(out, list(list(type = TOKEN_TYPES$OTHER,
-                                  val  = paste0("@", ref_str))))
+          ref_str <- paste(ref_parts, collapse = "")
+          new_val <- if (fn_up == "ANCHORARRAY") paste0(ref_str, "#") else paste0("@", ref_str)
+          push(list(type = TOKEN_TYPES$OTHER, val = new_val))
           i <- j
           next
         }
       }
 
       fn_out <- if (!is.null(locale)) .english_to_locale(fn_clean, locale) else fn_clean
-      out <- c(out, list(list(type = TOKEN_TYPES$FUNC, val = fn_out)))
-      i   <- i + 1L
+      push(list(type = TOKEN_TYPES$FUNC, val = fn_out))
+      i <- i + 1L
       next
     }
 
@@ -344,22 +367,23 @@ from_xml <- function(formula, locale = NULL) {
     if (tok$type == TOKEN_TYPES$IDENT) {
       fn_clean <- .strip_prefix(tok$val)
       fn_out   <- if (!is.null(locale)) .english_to_locale(fn_clean, locale) else fn_clean
-      out <- c(out, list(list(type = TOKEN_TYPES$IDENT, val = fn_out)))
-      i   <- i + 1L
+      push(list(type = TOKEN_TYPES$IDENT, val = fn_out))
+      i <- i + 1L
       next
     }
 
     # Separator: swap stored "," to locale separator in output
     if (tok$type == TOKEN_TYPES$OTHER && tok$val == ",") {
-      out <- c(out, list(list(type = TOKEN_TYPES$OTHER, val = local_sep)))
-      i   <- i + 1L
+      push(list(type = TOKEN_TYPES$OTHER, val = local_sep))
+      i <- i + 1L
       next
     }
 
-    out <- c(out, list(tok))
-    i   <- i + 1L
+    push(tok)
+    i <- i + 1L
   }
 
+  if (out_n < length(out)) length(out) <- out_n
   out
 }
 
