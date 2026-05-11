@@ -2,7 +2,7 @@
 # Core translation functions.
 #
 # Key OOXML namespace rules:
-#   1. _xlfn.       : future functions (post-Excel 2010)
+#   1. _xlfn.       : future functions (post-2010)
 #   2. _xlfn._xlws. : worksheet-scope dynamic arrays (FILTER, SORT)
 #   3. _xlpm.       : LAMBDA / LET parameter and variable names
 #   4. _xlfn.ANCHORARRAY(ref) : spilled range operator  ref#
@@ -10,15 +10,16 @@
 #
 # Separator handling:
 #   OOXML storage always uses "," as the argument separator.
-#   Localised Excel (e.g. German) uses ";" because "," is the decimal separator.
-#   to_xml() accepts the local separator and normalises to "," in output.
-#   from_xml() reads "," and emits the local separator when locale is set.
+#   Localised front-ends (e.g. German) use ";" because "," is the decimal
+#   separator. to_xml() accepts the local separator and normalises to ","
+#   in output. from_xml() reads "," and emits the local separator when
+#   locale is set.
 #
 # Case rules:
 #   - FUNC tokens (function names) are always uppercased — they live in the
 #     registry and OOXML requires uppercase names.
 #   - IDENT tokens (LAMBDA params, LET variable names, named ranges) preserve
-#     their original case. Excel is case-preserving for _xlpm. names.
+#     their original case. _xlpm. names are case-preserving.
 #     e.g. =LAMBDA(number, number+1)  ->  _xlfn.LAMBDA(_xlpm.number, _xlpm.number+1)
 #
 # LAMBDA / LET scoping:
@@ -31,9 +32,9 @@
 #   scope including inside nested calls in the body.
 
 
-#' Convert a user-facing Excel formula to OOXML storage format
+#' Convert a user-facing formula to OOXML storage format
 #'
-#' @param formula Character scalar or vector. Excel formula(s), with or without `=`.
+#' @param formula Character scalar or vector. Formula(s), with or without `=`.
 #' @param locale  Two-letter locale code (`"de"`, `"fr"`, …) or NULL.
 #'   When set, localised function names are translated to English and the
 #'   locale argument separator (`;` for many European locales) is accepted.
@@ -66,7 +67,7 @@ to_xml <- function(formula, locale = NULL, warn_unknown = TRUE) {
 }
 
 
-#' Convert an OOXML storage formula to user-facing Excel format
+#' Convert an OOXML storage formula to user-facing format
 #'
 #' @param formula Character scalar or vector. OOXML formula(s), with or without `=`.
 #' @param locale  Two-letter locale code or NULL. When set, function names are
@@ -98,7 +99,7 @@ from_xml <- function(formula, locale = NULL) {
 }
 
 
-# ── Internal transformation: Excel → OOXML ──────────────────────────────────
+# ── Internal transformation: user-facing → OOXML ────────────────────────────
 
 #' @keywords internal
 .transform_to_xml <- function(tokens, locale, warn_unknown) {
@@ -309,7 +310,7 @@ from_xml <- function(formula, locale = NULL) {
 }
 
 
-# ── Internal transformation: OOXML → Excel ───────────────────────────────────
+# ── Internal transformation: OOXML → user-facing ────────────────────────────
 
 #' @keywords internal
 .transform_from_xml <- function(tokens, locale, local_sep = .get_sep(locale)) {

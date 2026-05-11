@@ -14,10 +14,12 @@ round_trip(formula, locale = NULL, out_locale = NULL)
 \item{out_locale}{Locale for output (passed to \code{\link[=from_xml]{from_xml()}}).}
 }
 \value{
-Named list with \code{xml} (OOXML) and \code{excel} (round-tripped) formulas.
+Named list with \code{xml} (OOXML form) and \code{formula} (round-tripped
+user-facing form).
 }
 \description{
-Converts to OOXML then back to Excel. Useful for testing idempotency.
+Converts to OOXML then back to user-facing form. Useful for testing
+idempotency.
 }
 \examples{
 round_trip("=LAMBDA(x, x * 2)(5)")

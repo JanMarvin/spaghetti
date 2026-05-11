@@ -7,7 +7,7 @@
 check_formula(formula, locale = NULL)
 }
 \arguments{
-\item{formula}{Character scalar or vector of Excel formulas.}
+\item{formula}{Character scalar or vector of formulas.}
 
 \item{locale}{Locale code or NULL. When set, localised names are
 translated before checking.}
@@ -20,7 +20,7 @@ Returns an empty data frame (invisibly) if no issues are found.
 }
 \description{
 Tokenises a formula and reports any function names that are not in the
-Excel function registry, with spelling suggestions for likely typos.
+function registry, with spelling suggestions for likely typos.
 }
 \details{
 Unlike \code{to_xml()}, this does not translate — it is a pure linting pass.

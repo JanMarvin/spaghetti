@@ -4,20 +4,18 @@
 \alias{.detokenise}
 \title{Reconstruct a formula string from a token list}
 \usage{
-.detokenise(tokens, prefix_eq = TRUE, sep = ",")
+.detokenise(tokens, prefix_eq = TRUE)
 }
 \arguments{
 \item{tokens}{List of token objects.}
 
 \item{prefix_eq}{Logical; prepend '=' if TRUE.}
-
-\item{sep}{The separator used to join arguments (not strictly needed if
-tokens already contain the separator, but useful for validation).}
 }
 \value{
 Character scalar.
 }
 \description{
-Reconstruct a formula string from a token list
+Separator tokens (\verb{,}/\verb{;}) are already present in the token stream and
+have been swapped by the transform passes, so this is a simple concat.
 }
 \keyword{internal}

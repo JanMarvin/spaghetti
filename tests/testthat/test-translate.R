@@ -108,17 +108,17 @@ test_that("to_xml is idempotent (already-prefixed formula unchanged)", {
 })
 
 test_that("from_xml is idempotent (already stripped formula unchanged)", {
-  excel1 <- from_xml("=_xlfn.SEQUENCE(10)")
-  excel2 <- from_xml(excel1)
-  expect_equal(excel1, excel2)
+  out1 <- from_xml("=_xlfn.SEQUENCE(10)")
+  out2 <- from_xml(out1)
+  expect_equal(out1, out2)
 })
 
 # ── 11. Round-trip ───────────────────────────────────────────────────────────
-test_that("round_trip() returns consistent xml and excel", {
+test_that("round_trip() returns consistent xml and formula", {
   rt <- round_trip("=FILTER(A1:A10, B1:B10 > 5)")
-  expect_match(rt$xml,   "_xlfn._xlws.FILTER", fixed = TRUE)
-  expect_match(rt$locale, "FILTER",              fixed = TRUE)
-  expect_false(grepl("_xlfn", rt$locale, fixed = TRUE))
+  expect_match(rt$xml,     "_xlfn._xlws.FILTER", fixed = TRUE)
+  expect_match(rt$formula, "FILTER",             fixed = TRUE)
+  expect_false(grepl("_xlfn", rt$formula, fixed = TRUE))
 })
 
 # ── 12. Localisation: German ─────────────────────────────────────────────────
@@ -217,4 +217,75 @@ test_that("complex nested formula is handled correctly", {
   expect_match(result, "_xlfn._xlws.FILTER",  fixed = TRUE)
   expect_match(result, "_xlfn.UNIQUE",         fixed = TRUE)
   expect_match(result, "_xlfn._xlws.SORT",     fixed = TRUE)
+})
+
+# ── 21. @ followed by a function call → SINGLE wraps the call ────────────────
+test_that("@FUNC(...) wraps in _xlfn.SINGLE", {
+  expect_equal(
+    to_xml("=@SUM(A1:A10)"),
+    "=_xlfn.SINGLE(SUM(A1:A10))"
+  )
+  result <- to_xml("=@SEQUENCE(10)")
+  expect_match(result, "_xlfn.SINGLE(",  fixed = TRUE)
+  expect_match(result, "_xlfn.SEQUENCE", fixed = TRUE)
+})
+
+test_that("nested @FUNC nests SINGLEs correctly", {
+  expect_equal(
+    to_xml("=@OUTER(@INNER(A1))", warn_unknown = FALSE),
+    "=_xlfn.SINGLE(_xlfn.OUTER(_xlfn.SINGLE(_xlfn.INNER(A1))))"
+  )
+})
+
+# ── 22. LAMBDA body should not _xlpm-prefix non-parameter identifiers ────────
+test_that("LAMBDA body named-range references are not _xlpm-prefixed", {
+  # myRange is a named range, not a LAMBDA parameter
+  result <- to_xml("=LAMBDA(x, SUM(myRange, x))")
+  expect_match(result, "_xlpm.x",      fixed = TRUE)
+  expect_false(grepl("_xlpm.myRange",  result, fixed = TRUE))
+})
+
+test_that("LET body named-range references are not _xlpm-prefixed", {
+  result <- to_xml("=LET(a, 1, a + myRange)")
+  expect_match(result, "_xlpm.a",      fixed = TRUE)
+  expect_false(grepl("_xlpm.myRange",  result, fixed = TRUE))
+})
+
+test_that("LAMBDA(x, y) treats y as body, not as a second parameter", {
+  # `y` is the body expression (a named range reference), not a LAMBDA param
+  result <- to_xml("=LAMBDA(x, y)")
+  expect_match(result, "_xlpm.x",  fixed = TRUE)
+  expect_false(grepl("_xlpm.y", result, fixed = TRUE))
+})
+
+# ── 23. Number lexer: do not eat trailing +/- as part of a number ────────────
+test_that("simple arithmetic round-trips through tokeniser correctly", {
+  expect_equal(to_xml("=1+2"), "=1+2")
+  expect_equal(to_xml("=A1+1"), "=A1+1")
+  # Scientific notation still works
+  expect_equal(to_xml("=1e-3+1"), "=1e-3+1")
+  expect_equal(to_xml("=1.5E+2*A1"), "=1.5E+2*A1")
+})
+
+# ── 24. is_ooxml detects _xlws. tokens ───────────────────────────────────────
+test_that("is_ooxml recognises bare _xlws. (hypothetical) tokens", {
+  expect_true(is_ooxml("=_xlfn._xlws.FILTER(A1:A10,B1:B10>0)"))
+  expect_true(is_ooxml("=_xlws.FOO(A1)"))   # hypothetical bare _xlws.
+})
+
+# ── 25. Registry: no name appears in more than one tier ──────────────────────
+test_that("registry tiers are pairwise disjoint", {
+  L <- spaghetti:::.spaghetti_env$LEGACY
+  F <- spaghetti:::.spaghetti_env$XLFN
+  W <- spaghetti:::.spaghetti_env$XLWS
+  expect_length(intersect(L, F), 0L)
+  expect_length(intersect(L, W), 0L)
+  expect_length(intersect(F, W), 0L)
+})
+
+# ── 26. round_trip() returns named list with 'xml' and 'formula' ─────────────
+test_that("round_trip() exposes formula element (not 'locale' / not 'excel')", {
+  rt <- round_trip("=SEQUENCE(5)")
+  expect_named(rt, c("xml", "formula"))
+  expect_equal(rt$formula, "=SEQUENCE(5)")
 })

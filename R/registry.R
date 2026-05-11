@@ -194,7 +194,7 @@
 # Spell-check helper
 # ---------------------------------------------------------------------------
 
-#' Find the closest known Excel function name(s) to an unknown token.
+#' Find the closest known function name(s) to an unknown token.
 #'
 #' Uses generalised edit distance (utils::adist) over the full function
 #' registry. Returns up to `n` suggestions, or character(0) if the closest
@@ -230,14 +230,14 @@
   suggestions <- .spell_suggest(fn)
   if (length(suggestions) > 0L) {
     warning(
-      "Unknown Excel function: ", fn,
+      "Unknown function: ", fn,
       ". Did you mean: ", paste(suggestions, collapse = ", "), "?",
       call. = FALSE
     )
   } else {
     warning(
-      "Unknown Excel function: ", fn,
-      ". It will be prefixed with _xlfn. but may not work in Excel.",
+      "Unknown function: ", fn,
+      ". It will be prefixed with _xlfn. but may not be recognised.",
       call. = FALSE
     )
   }

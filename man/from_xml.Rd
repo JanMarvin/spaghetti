@@ -2,7 +2,7 @@
 % Please edit documentation in R/translate.R
 \name{from_xml}
 \alias{from_xml}
-\title{Convert an OOXML storage formula to user-facing Excel format}
+\title{Convert an OOXML storage formula to user-facing format}
 \usage{
 from_xml(formula, locale = NULL)
 }
@@ -16,7 +16,7 @@ translated to the target locale and the locale separator is used in output.}
 Character scalar or vector: user-facing formula(s) starting with \code{=}.
 }
 \description{
-Convert an OOXML storage formula to user-facing Excel format
+Convert an OOXML storage formula to user-facing format
 }
 \examples{
 from_xml("=_xlfn.SEQUENCE(10)")

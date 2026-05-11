@@ -2,12 +2,12 @@
 % Please edit documentation in R/translate.R
 \name{to_xml}
 \alias{to_xml}
-\title{Convert a user-facing Excel formula to OOXML storage format}
+\title{Convert a user-facing formula to OOXML storage format}
 \usage{
 to_xml(formula, locale = NULL, warn_unknown = TRUE)
 }
 \arguments{
-\item{formula}{Character scalar or vector. Excel formula(s), with or without \code{=}.}
+\item{formula}{Character scalar or vector. Formula(s), with or without \code{=}.}
 
 \item{locale}{Two-letter locale code (\code{"de"}, \code{"fr"}, …) or NULL.
 When set, localised function names are translated to English and the
@@ -19,7 +19,7 @@ locale argument separator (\verb{;} for many European locales) is accepted.}
 Character scalar or vector: OOXML formula(s) starting with \code{=}.
 }
 \description{
-Convert a user-facing Excel formula to OOXML storage format
+Convert a user-facing formula to OOXML storage format
 }
 \examples{
 to_xml("=SEQUENCE(10)")

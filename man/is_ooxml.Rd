@@ -14,7 +14,7 @@ Logical.
 }
 \description{
 A formula is considered "already OOXML" if it contains at least one
-\verb{_xlfn.} or \verb{_xlpm.} token.
+\verb{_xlfn.}, \verb{_xlws.}, or \verb{_xlpm.} token.
 }
 \examples{
 is_ooxml("=_xlfn.SEQUENCE(10)")   # TRUE

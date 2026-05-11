@@ -2,7 +2,7 @@
 % Please edit documentation in R/registry.R
 \name{.spell_suggest}
 \alias{.spell_suggest}
-\title{Find the closest known Excel function name(s) to an unknown token.}
+\title{Find the closest known function name(s) to an unknown token.}
 \usage{
 .spell_suggest(fn, n = 3L, max_dist = 3L)
 }

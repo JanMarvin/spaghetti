@@ -4,7 +4,7 @@
 # tidyxl::xlex(). Useful for understanding how spaghetti parses a formula
 # and for debugging translation issues.
 #
-# The tree nesting follows Excel's call structure:
+# The tree nesting follows the call structure of the source formula:
 #   - Each FUNC token becomes a parent node
 #   - Tokens between its '(' and matching ')' are its children
 #   - Nested function calls produce nested subtrees

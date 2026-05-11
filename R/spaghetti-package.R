@@ -1,8 +1,9 @@
-#' spaghetti: Bidirectional Excel Formula to OOXML Translator
+#' spaghetti: Bidirectional Spreadsheet-Formula to OOXML Translator
 #'
 #' @description
-#' Translates Excel formulas between the user-facing format (as seen in the
-#' formula bar) and the OOXML storage format (as found in `.xlsx` XML source).
+#' Translates spreadsheet formulas between the user-facing format (as
+#' displayed to the end user) and the OOXML storage format (as found in
+#' `.xlsx` XML source).
 #'
 #' ## Key transformations
 #'
@@ -16,15 +17,15 @@
 #'
 #' ## Main functions
 #'
-#' - [to_xml()]: Excel formula bar → OOXML storage
-#' - [from_xml()]: OOXML storage → Excel formula bar
+#' - [to_xml()]: user-facing form → OOXML storage
+#' - [from_xml()]: OOXML storage → user-facing form
 #' - [function_prefix()]: inspect prefix tier for any function name
 #' - [supported_locales()]: list available locale codes
 #' - [round_trip()]: convert and back-convert for testing
 #'
 #' ## Localisation
 #'
-#' Excel ships with translated function names in non-English locales.
+#' Non-English locales ship with translated function names.
 #' Pass `locale = "de"` (German), `"fr"` (French), `"es"` (Spanish), etc.
 #' to [to_xml()] to translate local names to English before prefixing,
 #' or to [from_xml()] to output localised names.

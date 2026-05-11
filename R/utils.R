@@ -30,30 +30,32 @@ is_ooxml <- function(formula) {
 
 #' Round-trip a formula through OOXML and back
 #'
-#' Converts to OOXML then back to Excel. Useful for testing idempotency.
+#' Converts to OOXML then back to user-facing form. Useful for testing
+#' idempotency.
 #'
 #' @param formula  Character scalar.
 #' @param locale   Locale for input formula (passed to [to_xml()]).
 #' @param out_locale Locale for output (passed to [from_xml()]).
 #'
-#' @return Named list with `xml` (OOXML) and `excel` (round-tripped) formulas.
+#' @return Named list with `xml` (OOXML form) and `formula` (round-tripped
+#'   user-facing form).
 #' @export
 #' @examples
 #' round_trip("=LAMBDA(x, x * 2)(5)")
 round_trip <- function(formula, locale = NULL, out_locale = NULL) {
-  xml   <- to_xml(formula, locale = locale)
-  excel <- from_xml(xml,   locale = out_locale)
-  list(xml = xml, excel = excel)
+  xml <- to_xml(formula, locale = locale)
+  out <- from_xml(xml,   locale = out_locale)
+  list(xml = xml, formula = out)
 }
 
 #' Check a formula for unknown function names
 #'
 #' Tokenises a formula and reports any function names that are not in the
-#' Excel function registry, with spelling suggestions for likely typos.
+#' function registry, with spelling suggestions for likely typos.
 #'
 #' Unlike `to_xml()`, this does not translate — it is a pure linting pass.
 #'
-#' @param formula  Character scalar or vector of Excel formulas.
+#' @param formula  Character scalar or vector of formulas.
 #' @param locale   Locale code or NULL. When set, localised names are
 #'                 translated before checking.
 #'

@@ -4,10 +4,11 @@
 \name{spaghetti-package}
 \alias{spaghetti}
 \alias{spaghetti-package}
-\title{spaghetti: Bidirectional Excel Formula to OOXML Translator}
+\title{spaghetti: Bidirectional Spreadsheet-Formula to OOXML Translator}
 \description{
-Translates Excel formulas between the user-facing format (as seen in the
-formula bar) and the OOXML storage format (as found in \code{.xlsx} XML source).
+Translates spreadsheet formulas between the user-facing format (as
+displayed to the end user) and the OOXML storage format (as found in
+\code{.xlsx} XML source).
 \subsection{Key transformations}{\tabular{lll}{
    User-facing \tab OOXML storage \tab Rule \cr
    \code{SEQUENCE(10)} \tab \verb{_xlfn.SEQUENCE(10)} \tab Future function prefix \cr
@@ -21,8 +22,8 @@ formula bar) and the OOXML storage format (as found in \code{.xlsx} XML source).
 
 \subsection{Main functions}{
 \itemize{
-\item \code{\link[=to_xml]{to_xml()}}: Excel formula bar → OOXML storage
-\item \code{\link[=from_xml]{from_xml()}}: OOXML storage → Excel formula bar
+\item \code{\link[=to_xml]{to_xml()}}: user-facing form → OOXML storage
+\item \code{\link[=from_xml]{from_xml()}}: OOXML storage → user-facing form
 \item \code{\link[=function_prefix]{function_prefix()}}: inspect prefix tier for any function name
 \item \code{\link[=supported_locales]{supported_locales()}}: list available locale codes
 \item \code{\link[=round_trip]{round_trip()}}: convert and back-convert for testing
@@ -31,7 +32,7 @@ formula bar) and the OOXML storage format (as found in \code{.xlsx} XML source).
 
 \subsection{Localisation}{
 
-Excel ships with translated function names in non-English locales.
+Non-English locales ship with translated function names.
 Pass \code{locale = "de"} (German), \code{"fr"} (French), \code{"es"} (Spanish), etc.
 to \code{\link[=to_xml]{to_xml()}} to translate local names to English before prefixing,
 or to \code{\link[=from_xml]{from_xml()}} to output localised names.

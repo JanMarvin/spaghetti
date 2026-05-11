@@ -2,7 +2,7 @@
 % Please edit documentation in R/lexer.R
 \name{.tokenise}
 \alias{.tokenise}
-\title{Tokenise an Excel formula string}
+\title{Tokenise a formula string}
 \usage{
 .tokenise(formula, sep = ",")
 }
@@ -15,6 +15,6 @@
 A list of token objects, each with fields \code{type} and \code{val}.
 }
 \description{
-Tokenise an Excel formula string
+Tokenise a formula string
 }
 \keyword{internal}

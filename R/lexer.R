@@ -1,7 +1,7 @@
 # R/lexer.R
-# Lexical analyser for Excel formula strings.
+# Lexical analyser for formula strings.
 #
-# Excel formula syntax is not regular: string literals can contain
+# Formula syntax is not regular: string literals can contain
 # function-name-like tokens, and the @ and # operators are contextual.
 # A simple regex gsub over the whole formula will corrupt string content.
 #
@@ -24,7 +24,7 @@ TOKEN_TYPES <- list(
   OTHER    = "OTHER"
 )
 
-#' Tokenise an Excel formula string
+#' Tokenise a formula string
 #'
 #' @param formula Character scalar, optionally starting with '='.
 #' @param sep The argument separator (e.g., ',' or ';').
