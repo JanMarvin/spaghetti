@@ -118,5 +118,5 @@ function_table <- function() {
     warning("Function table not loaded. Run data-raw/parse_locales.R first.")
     return(data.frame())
   }
-  df
+  df[, setdiff(names(df), "term_id"), drop = FALSE]
 }
