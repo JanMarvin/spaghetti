@@ -49,11 +49,11 @@ Supported locales: af, sq, am-ET, ar, hy, as-IN, az-Latn, bn, eu, be, bs-Cyrl, b
 }
 }
 \author{
-\strong{Maintainer}: spaghetti authors \email{maintainer@example.com}
+\strong{Maintainer}: Jan Marvin Garbuszus \email{jan.garbuszus@ruhr-uni-bochum.de}
 
 Authors:
 \itemize{
-  \item spaghetti authors \email{maintainer@example.com}
+  \item Jan Marvin Garbuszus \email{jan.garbuszus@ruhr-uni-bochum.de}
 }
 
 }

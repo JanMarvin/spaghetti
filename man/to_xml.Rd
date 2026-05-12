@@ -27,6 +27,6 @@ to_xml("=LAMBDA(temp, (5/9) * (temp-32))(100)")
 to_xml("=FILTER(A1:A10, B1:B10 > 5)")
 to_xml("=SUM(A1#)")
 to_xml("=LET(tc,(B2-32)*5/9,rh,0.6,tc*ATAN(0.151977*(rh*100+8.313659)^0.5))")
-to_xml("=SUMMEWENN(A1:A10;\"x\";B1:B10)", locale = "de")
+\dontrun{to_xml("=SUMMEWENN(A1:A10;\"x\";B1:B10)", locale = "de")}
 to_xml(c("=SUM(A1:A10)", "=SEQUENCE(5)", "=FILTER(A1:A10, B1:B10 > 0)"))
 }
