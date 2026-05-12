@@ -1,3 +1,53 @@
+# spaghetti 0.3.0
+
+## Breaking changes
+
+* Locale translation data is no longer bundled with the package.
+  Previously, `inst/extdata/excel_functions.rds` shipped a pre-built
+  function-name translation table extracted from the Microsoft
+  Terminology Collection. Microsoft does not publish an explicit
+  license for the Terminology Collection contents, so this package now
+  ships only the parser. Users invoke `setup_terminology()` once per
+  machine to download (~100 MB) and parse the data into a per-user
+  cache directory (`tools::R_user_dir("spaghetti", "data")`).
+
+* `to_xml()` / `from_xml()` / `check_formula()` calls with a non-NULL
+  `locale` argument will now error if the terminology cache has not
+  been built. The error message directs the user to
+  `setup_terminology()`. Calls with `locale = NULL` (the default)
+  work as before with no setup required.
+
+* R version requirement bumped to R >= 4.0.0 (for `tools::R_user_dir`).
+
+## New features
+
+* `setup_terminology(expected_sha256 = NULL, force = FALSE, workers, quiet)`:
+  downloads the Microsoft Terminology Collection zip from Microsoft's
+  public download URL, optionally verifies it against a known SHA-256
+  hex digest, unzips, parses, and writes the cached RDS. If
+  `expected_sha256` is NULL the observed digest is printed so you can
+  pin it for future invocations. Thin R wrapper around the parser
+  script in `inst/extdata/parse_locales.R`.
+
+* `has_terminology()`: returns TRUE if a terminology cache is loaded.
+
+* `clear_terminology()`: removes the cached RDS.
+
+* `inst/extdata/parse_locales.R` gains a `download_and_parse_tbx()`
+  function that the R wrapper invokes. The script can also be sourced
+  manually (`source(system.file("extdata", "parse_locales.R",
+  package = "spaghetti"))`) for users who want to drive the parser
+  themselves.
+
+## Internal
+
+* `openxlsx2` and `digest` are declared in `Suggests`;
+  `setup_terminology()` checks for them at runtime.
+
+* `.onLoad()` looks for a cached RDS in the user data directory; if
+  found it loads it silently, otherwise leaves the locale tables empty.
+
+
 # spaghetti 0.2.0
 
 ## Breaking changes

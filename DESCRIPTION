@@ -1,6 +1,6 @@
 Package: spaghetti
 Title: Bidirectional Spreadsheet-Formula to OOXML Translator
-Version: 0.2.0
+Version: 0.3.0
 Authors@R: person("spaghetti", "authors", email = "maintainer@example.com",
   role = c("aut", "cre"))
 Description: Translates spreadsheet formulas between the user-facing format
@@ -8,13 +8,18 @@ Description: Translates spreadsheet formulas between the user-facing format
     in .xlsx XML source). Handles future function prefixes (_xlfn.),
     web-service namespaces (_xlfn._xlws.), LAMBDA parameter prefixes
     (_xlpm.), spilled range operators (ANCHORARRAY), implicit intersection
-    (SINGLE), and localised function name translation across 40+ locales.
+    (SINGLE), and optional localised function name translation across the
+    locales in the Microsoft Terminology Collection (run
+    setup_terminology() once to download and cache the translations).
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-Depends: R (>= 3.5.0)
-Suggests: testthat (>= 3.0.0)
-Config/testthat/edition: 3
+Depends: R (>= 4.0.0)
 Imports: utils
+Suggests:
+    testthat (>= 3.0.0),
+    openxlsx2,
+    digest
+Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
 NeedsCompilation: no

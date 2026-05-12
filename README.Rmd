@@ -229,9 +229,14 @@ print(readable_de)
 
 ## Localisation
 
-`openxlsx2` only accepts English function names. If you have formulas authored
-in a localised Excel (e.g. German `SUMMEWENN` instead of `SUMIF`), pass the
-`locale` argument to `to_xml()` to translate first:
+`openxlsx2` only accepts English function names. If you have formulas
+authored in a localised application (e.g. German `SUMMEWENN` instead of
+`SUMIF`), pass the `locale` argument to `to_xml()` to translate first.
+
+
+**Setup required**: run `setup_terminology()` once per machine to
+download the function-name translation data. Without that, locale calls
+will error.
 
 ```{r}
 # German formula → OOXML (translates SUMMEWENNS, SVERWEIS, etc.)
