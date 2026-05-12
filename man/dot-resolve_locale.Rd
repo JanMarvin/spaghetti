@@ -9,7 +9,7 @@
 \description{
 Tries an exact case-insensitive match first; failing that, splits on
 '-'/'\emph{' and tries the leading segment (so \code{de-DE} falls back to \code{de},
-\code{pt-BR} falls back to \code{pt}, \code{zh-Hans-CN} falls back to \code{zh-Hans} then
-\code{zh}). Returns NA_character} if nothing matches.
+\code{zh-Hans-CN} falls back to \code{zh-Hans} then \code{zh}). Returns NA_character}
+if nothing matches.
 }
 \keyword{internal}

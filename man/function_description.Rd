@@ -10,10 +10,12 @@ function_description(fn)
 \item{fn}{Character vector of function names (English, any case).}
 }
 \value{
-Character vector of descriptions (NA where not found).
+Character vector of descriptions (NA where not found / available).
 }
 \description{
-Look up the English description for a function.
+Reads from the cached Microsoft Terminology Collection table; available
+only after \code{setup_terminology()} has been run. Returns NA for every
+input if the cache is missing.
 }
 \examples{
 function_description(c("SUM", "XLOOKUP", "LAMBDA"))

@@ -468,6 +468,95 @@ parse_all_tbx <- function(
 }
 
 # ---------------------------------------------------------------------------
+# 5b. Download + verify + unzip + parse driver
+# ---------------------------------------------------------------------------
+
+# Source URL for the Microsoft Terminology Collection. Documented at
+# https://learn.microsoft.com/en-us/globalization/reference/microsoft-terminology
+MTC_URL <- "https://download.microsoft.com/download/b/2/d/b2db7a7c-8d33-47f3-b2c1-ee5e6445cf45/MicrosoftTermCollection.zip"
+
+#' Download the Microsoft Terminology Collection zip, verify it (optionally)
+#' against an expected SHA-256, unzip it to a tempdir, parse all .tbx files
+#' it contains, and write the resulting master data frame to dest_rds.
+#'
+#' Intended to be invoked via `spaghetti::setup_terminology()` but can be
+#' called directly if you `source()` this script yourself.
+#'
+#' @param dest_rds        Path to write the parsed RDS to.
+#' @param expected_sha256 Optional. If supplied, verify the downloaded
+#'                        zip against this hex digest. If NULL, the
+#'                        observed digest is printed so you can record
+#'                        it for future invocations.
+#' @param workers         Parallel workers for TBX parsing.
+#' @param quiet           If TRUE, suppress progress messages.
+#' @return The master data frame (invisibly).
+download_and_parse_tbx <- function(dest_rds,
+                                   expected_sha256 = NULL,
+                                   workers = max(1L, parallel::detectCores() - 1L),
+                                   quiet = FALSE) {
+
+  if (!requireNamespace("digest", quietly = TRUE)) {
+    stop("Package 'digest' is required for SHA-256 verification. ",
+         "Install it with:\n  install.packages(\"digest\")", call. = FALSE)
+  }
+  if (!requireNamespace("openxlsx2", quietly = TRUE)) {
+    stop("Package 'openxlsx2' is required to parse TBX files. ",
+         "Install it with:\n  install.packages(\"openxlsx2\")", call. = FALSE)
+  }
+
+  tmp <- tempfile("MicrosoftTermCollection_", fileext = ".zip")
+  on.exit(unlink(tmp), add = TRUE)
+
+  if (!quiet) message("Downloading: ", MTC_URL, "\n  -> ", tmp)
+  status <- tryCatch(
+    utils::download.file(MTC_URL, tmp, mode = "wb", quiet = quiet),
+    error = function(e) e
+  )
+  if (inherits(status, "error")) {
+    stop("Download failed: ", conditionMessage(status), call. = FALSE)
+  }
+  if (!file.exists(tmp) || file.size(tmp) == 0L) {
+    stop("Download produced no file (or empty file).", call. = FALSE)
+  }
+
+  observed <- digest::digest(file = tmp, algo = "sha256")
+  if (!quiet) message("Downloaded ", round(file.size(tmp) / 1024^2, 1),
+                      " MB; SHA-256 = ", observed)
+
+  if (!is.null(expected_sha256)) {
+    exp_norm <- tolower(gsub("[^0-9a-fA-F]", "", expected_sha256))
+    if (!identical(exp_norm, tolower(observed))) {
+      stop("SHA-256 mismatch.\n",
+           "  expected: ", exp_norm, "\n",
+           "  observed: ", observed, "\n",
+           "Aborting before parsing. If you trust the new file, ",
+           "re-invoke with expected_sha256 = NULL or update the expected ",
+           "value.", call. = FALSE)
+    }
+    if (!quiet) message("SHA-256 OK.")
+  } else if (!quiet) {
+    message("(No expected_sha256 supplied; verification skipped. ",
+            "Record the digest above to pin future runs.)")
+  }
+
+  extract_dir <- tempfile("tbx_")
+  dir.create(extract_dir, recursive = TRUE)
+  on.exit(unlink(extract_dir, recursive = TRUE), add = TRUE)
+
+  if (!quiet) message("Unzipping into: ", extract_dir)
+  utils::unzip(tmp, exdir = extract_dir)
+
+  if (!quiet) message("Parsing TBX files...")
+  master <- parse_all_tbx(folder      = extract_dir,
+                          outfile_rds = dest_rds,
+                          outfile_r   = NULL,
+                          workers     = workers)
+
+  if (!quiet) message("Cached terminology saved to: ", dest_rds)
+  invisible(master)
+}
+
+# ---------------------------------------------------------------------------
 # 6.  Run
 # ---------------------------------------------------------------------------
 

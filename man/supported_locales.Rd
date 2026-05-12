@@ -10,9 +10,13 @@ supported_locales()
 Character vector of locale codes (e.g. \verb{c("de", "fr", "es", …)}).
 }
 \description{
-Returns the locale columns present in the FUNCTIONS data frame, i.e. the
-locales for which at least partial translation data was loaded.
+Returns the locale columns present in the cached function table, i.e.
+the locales for which at least partial translation data was loaded.
+Returns \code{character(0)} if \code{setup_terminology()} hasn't been run.
 }
 \examples{
 supported_locales()
+}
+\seealso{
+\code{\link[=setup_terminology]{setup_terminology()}}, \code{\link[=has_terminology]{has_terminology()}}
 }

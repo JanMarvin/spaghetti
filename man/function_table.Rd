@@ -2,7 +2,7 @@
 % Please edit documentation in R/locales.R
 \name{function_table}
 \alias{function_table}
-\title{Return the full function data frame.}
+\title{Return the full function translation table.}
 \usage{
 function_table()
 }
@@ -10,10 +10,17 @@ function_table()
 data.frame
 }
 \description{
-One row per known function, columns: fn, description, and one column per
-supported locale containing the localised function name (NA if not
-translated).
+Columns: \code{fn} (English name), \code{description} (if available), and one
+column per supported locale with the localised function name (NA if
+not translated for that locale).
+}
+\details{
+If \code{setup_terminology()} hasn't been run, returns a single-column
+data frame with just \code{fn}.
 }
 \examples{
 head(function_table())
+}
+\seealso{
+\code{\link[=setup_terminology]{setup_terminology()}}, \code{\link[=supported_locales]{supported_locales()}}
 }
