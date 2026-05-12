@@ -526,14 +526,14 @@ download_and_parse_tbx <- function(dest_rds,
   if (!is.null(expected_sha256)) {
     exp_norm <- tolower(gsub("[^0-9a-fA-F]", "", expected_sha256))
     if (!identical(exp_norm, tolower(observed))) {
-      stop("SHA-256 mismatch.\n",
-           "  expected: ", exp_norm, "\n",
-           "  observed: ", observed, "\n",
-           "Aborting before parsing. If you trust the new file, ",
-           "re-invoke with expected_sha256 = NULL or update the expected ",
-           "value.", call. = FALSE)
+      warning("SHA-256 mismatch.\n",
+              "  expected: ", exp_norm, "\n",
+              "  observed: ", observed, "\n",
+              "Microsoft may have updated the Terminology Collection. ",
+              "Continuing anyway.", call. = FALSE)
+    } else if (!quiet) {
+      message("SHA-256 OK.")
     }
-    if (!quiet) message("SHA-256 OK.")
   } else if (!quiet) {
     message("(No expected_sha256 supplied; verification skipped. ",
             "Record the digest above to pin future runs.)")
@@ -548,9 +548,16 @@ download_and_parse_tbx <- function(dest_rds,
 
   if (!quiet) message("Parsing TBX files...")
   master <- parse_all_tbx(folder      = extract_dir,
-                          outfile_rds = dest_rds,
+                          outfile_rds = NULL,
                           outfile_r   = NULL,
                           workers     = workers)
+
+  attr(master, "source_url")          <- MTC_URL
+  attr(master, "source_sha256")       <- observed
+  attr(master, "downloaded_at")       <- format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z")
+  attr(master, "spaghetti_version")   <- as.character(utils::packageVersion("spaghetti"))
+
+  saveRDS(master, dest_rds)
 
   if (!quiet) message("Cached terminology saved to: ", dest_rds)
   invisible(master)

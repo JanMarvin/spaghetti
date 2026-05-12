@@ -38,6 +38,12 @@ has_terminology <- function() {
   isTRUE(.spaghetti_env$has_terminology)
 }
 
+#' Known-good SHA-256 of the Microsoft Terminology Collection zip.
+#' Recorded once; mismatches warn but do not abort, since Microsoft may
+#' republish the zip without notice.
+#' @keywords internal
+.MTC_EXPECTED_SHA256 <- "fed7d16955fd4063731712704cbd6584869a9009acf8a9c3c3de31e0d4ebdfe6"
+
 #' Download and parse the Microsoft Terminology Collection.
 #'
 #' Source()s the parser script bundled in `inst/extdata/parse_locales.R`,
@@ -58,26 +64,26 @@ has_terminology <- function() {
 #'   the Terminology Collection. The data is downloaded directly from
 #'   Microsoft; this package does not redistribute it.
 #'
-#' @param expected_sha256 Optional. If supplied, the downloaded zip is
-#'   verified against this SHA-256 hex digest and parsing aborts on
-#'   mismatch. If NULL (default), the observed digest is printed so you
-#'   can record it for future invocations.
+#' @param expected_sha256 SHA-256 hex digest expected for the downloaded
+#'   zip. Defaults to the digest of the version of the zip known to this
+#'   release of spaghetti. A mismatch produces a warning (not an error),
+#'   since Microsoft may republish the file. Pass `NULL` to skip the
+#'   check entirely.
 #' @param force      If TRUE, re-download even if a cache exists.
 #' @param workers    Number of parallel TBX-parsing workers. Default
 #'                   detects cores - 1, capped to 8.
 #' @param quiet      If TRUE, suppress progress messages.
 #'
 #' @return Invisibly, the path to the cached RDS.
-#' @seealso [has_terminology()], [clear_terminology()]
+#' @seealso [has_terminology()], [clear_terminology()], [terminology_info()]
 #' @export
 #' @examples
 #' \dontrun{
 #' setup_terminology()
-#' # Once you have a known-good hash, lock it in:
-#' setup_terminology(expected_sha256 =
-#'   "abc123...")
+#' # Skip verification entirely:
+#' setup_terminology(expected_sha256 = NULL)
 #' }
-setup_terminology <- function(expected_sha256 = NULL,
+setup_terminology <- function(expected_sha256 = .MTC_EXPECTED_SHA256,
                               force      = FALSE,
                               workers    = max(1L, parallel::detectCores() - 1L),
                               quiet      = FALSE) {
@@ -133,16 +139,40 @@ setup_terminology <- function(expected_sha256 = NULL,
 #'
 #' @return Invisibly TRUE if a cache was removed, FALSE if none existed.
 #' @export
-clear_terminology <- function() {
-  rds_path <- .terminology_path()
-  if (!file.exists(rds_path)) {
-    .reset_terminology_state()
-    return(invisible(FALSE))
-  }
-  unlink(rds_path)
+clear_terminology <- function() {  rds_path <- .terminology_path()
+if (!file.exists(rds_path)) {
   .reset_terminology_state()
-  message("Terminology cache cleared.")
-  invisible(TRUE)
+  return(invisible(FALSE))
+}
+unlink(rds_path)
+.reset_terminology_state()
+message("Terminology cache cleared.")
+invisible(TRUE)
+}
+
+#' Metadata about the currently loaded terminology cache.
+#'
+#' Returns the provenance attributes that were attached to the cached
+#' RDS at download time: source URL, observed SHA-256, download timestamp,
+#' and the spaghetti version that produced the cache. Returns `NULL` if
+#' no terminology is currently loaded.
+#'
+#' @return A named list, or `NULL`.
+#' @export
+#' @examples
+#' terminology_info()
+terminology_info <- function() {
+  df <- .spaghetti_env$FUNCTIONS
+  if (is.null(df)) return(NULL)
+  list(
+    source_url        = attr(df, "source_url"),
+    source_sha256     = attr(df, "source_sha256"),
+    downloaded_at     = attr(df, "downloaded_at"),
+    spaghetti_version = attr(df, "spaghetti_version"),
+    cache_path        = .terminology_path(),
+    n_functions       = nrow(df),
+    n_locales         = length(supported_locales())
+  )
 }
 
 #' Load the cached RDS into .spaghetti_env. Called from .onLoad() and

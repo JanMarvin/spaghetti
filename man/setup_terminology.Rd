@@ -5,17 +5,18 @@
 \title{Download and parse the Microsoft Terminology Collection.}
 \usage{
 setup_terminology(
-  expected_sha256 = NULL,
+  expected_sha256 = .MTC_EXPECTED_SHA256,
   force = FALSE,
   workers = max(1L, parallel::detectCores() - 1L),
   quiet = FALSE
 )
 }
 \arguments{
-\item{expected_sha256}{Optional. If supplied, the downloaded zip is
-verified against this SHA-256 hex digest and parsing aborts on
-mismatch. If NULL (default), the observed digest is printed so you
-can record it for future invocations.}
+\item{expected_sha256}{SHA-256 hex digest expected for the downloaded
+zip. Defaults to the digest of the version of the zip known to this
+release of spaghetti. A mismatch produces a warning (not an error),
+since Microsoft may republish the file. Pass \code{NULL} to skip the
+check entirely.}
 
 \item{force}{If TRUE, re-download even if a cache exists.}
 
@@ -54,11 +55,10 @@ Microsoft; this package does not redistribute it.
 \examples{
 \dontrun{
 setup_terminology()
-# Once you have a known-good hash, lock it in:
-setup_terminology(expected_sha256 =
-  "abc123...")
+# Skip verification entirely:
+setup_terminology(expected_sha256 = NULL)
 }
 }
 \seealso{
-\code{\link[=has_terminology]{has_terminology()}}, \code{\link[=clear_terminology]{clear_terminology()}}
+\code{\link[=has_terminology]{has_terminology()}}, \code{\link[=clear_terminology]{clear_terminology()}}, \code{\link[=terminology_info]{terminology_info()}}
 }

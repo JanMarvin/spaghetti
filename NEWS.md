@@ -21,13 +21,20 @@
 
 ## New features
 
-* `setup_terminology(expected_sha256 = NULL, force = FALSE, workers, quiet)`:
+* `setup_terminology(expected_sha256, force, workers, quiet)`:
   downloads the Microsoft Terminology Collection zip from Microsoft's
-  public download URL, optionally verifies it against a known SHA-256
-  hex digest, unzips, parses, and writes the cached RDS. If
-  `expected_sha256` is NULL the observed digest is printed so you can
-  pin it for future invocations. Thin R wrapper around the parser
-  script in `inst/extdata/parse_locales.R`.
+  public download URL, verifies it against a known-good SHA-256 digest
+  (overridable; mismatches warn but do not abort, since Microsoft can
+  republish the file at any time), unzips, parses, and writes the
+  cached RDS. Pass `expected_sha256 = NULL` to skip verification.
+  Thin R wrapper around the parser script in
+  `inst/extdata/parse_locales.R`.
+
+* `terminology_info()`: returns the provenance attributes attached to
+  the cached RDS at download time — source URL, observed SHA-256,
+  timestamp, spaghetti version, cache path, function count, locale
+  count. Useful for verifying which version of the Microsoft data is
+  currently loaded.
 
 * `has_terminology()`: returns TRUE if a terminology cache is loaded.
 
