@@ -208,6 +208,7 @@ terminology_info <- function() {
 
 #' Build per-locale lookup environments from a FUNCTIONS data frame.
 #' @keywords internal
+#' @importFrom stats setNames
 .build_locale_lookup_tables <- function(df) {
   loc_cols <- setdiff(names(df), c("fn", "description", "term_id"))
   loc_to_en <- list()
