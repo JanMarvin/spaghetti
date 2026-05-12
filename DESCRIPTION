@@ -1,8 +1,9 @@
 Package: spaghetti
 Title: Bidirectional Spreadsheet-Formula to OOXML Translator
 Version: 0.3.0
-Authors@R: person("spaghetti", "authors", email = "maintainer@example.com",
-  role = c("aut", "cre"))
+Authors@R: c(
+    person("Jan Marvin", "Garbuszus", email = "jan.garbuszus@ruhr-uni-bochum.de", role = c("aut", "cre"))
+  )
 Description: Translates spreadsheet formulas between the user-facing format
     (as displayed to the end user) and the OOXML storage format (as found
     in .xlsx XML source). Handles future function prefixes (_xlfn.),
