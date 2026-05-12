@@ -78,6 +78,7 @@ test_that("warning message includes suggestion", {
 })
 
 test_that("localized unknown function uses translated name for lookup", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   # SUMMEWENNS is valid German for SUMIFS — should not warn
   expect_no_warning(
     to_xml("=SUMMEWENNS(C2:C10;A2:A10;\"x\")", locale = "de",
@@ -86,6 +87,7 @@ test_that("localized unknown function uses translated name for lookup", {
 })
 
 test_that("check_formula respects locale separator", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   # semicolon-separated German formula with a real typo
   result <- suppressWarnings(
     check_formula("=SUMMEWENNSS(C2:C10;A2:A10;\"x\")", locale = "de")

@@ -23,6 +23,6 @@ from_xml("=_xlfn.SEQUENCE(10)")
 from_xml("=_xlfn.LAMBDA(_xlpm.temp, (5/9) * (_xlpm.temp-32))(100)")
 from_xml("=_xlfn._xlws.FILTER(A1:A10,B1:B10>5)")
 from_xml("=SUM(_xlfn.ANCHORARRAY(A1))")
-from_xml("=_xlfn.SEQUENCE(10)", locale = "de")
+\dontrun{from_xml("=_xlfn.SEQUENCE(10)", locale = "de")}
 from_xml(c("=_xlfn.SEQUENCE(5)", "=SUM(_xlfn.ANCHORARRAY(A1))"))
 }

@@ -123,28 +123,33 @@ test_that("round_trip() returns consistent xml and formula", {
 
 # ── 12. Localisation: German ─────────────────────────────────────────────────
 test_that("German function names are translated to English in to_xml", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   result <- to_xml("=SUMME(A1:A10)", locale = "de")
   expect_match(result, "SUM", fixed = TRUE)
   expect_false(grepl("SUMME", result, fixed = TRUE))
 })
 
 test_that("from_xml can output German function names", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   result <- from_xml("=SUM(A1:A10)", locale = "de")
   expect_match(result, "SUMME", fixed = TRUE)
 })
 
 test_that("German SVERWEIS becomes VLOOKUP in OOXML", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   result <- to_xml("=SVERWEIS(A1,B:C,2,0)", locale = "de")
   expect_match(result, "VLOOKUP", fixed = TRUE)
 })
 
 # ── 13. Localisation: French ─────────────────────────────────────────────────
 test_that("French SOMME is translated correctly", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   result <- to_xml("=SOMME(A1:A10)", locale = "fr")
   expect_match(result, "SUM", fixed = TRUE)
 })
 
 test_that("French RECHERCHEV is translated to VLOOKUP", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   result <- to_xml("=RECHERCHEV(A1,B:C,2,0)", locale = "fr")
   expect_match(result, "VLOOKUP", fixed = TRUE)
 })
@@ -184,6 +189,7 @@ test_that("is_ooxml correctly identifies prefixed formulas", {
 
 # ── 17. supported_locales() ──────────────────────────────────────────────────
 test_that("supported_locales returns expected codes", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   locs <- supported_locales()
   expect_true("de" %in% locs)
   expect_true("fr" %in% locs)
@@ -323,6 +329,7 @@ test_that("sheet-qualified @ wraps the full ref in SINGLE", {
 
 # ── 29. Multi-segment locale codes resolve correctly ─────────────────────────
 test_that("multi-segment locale 'de-DE' falls back to 'de'", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   result <- to_xml("=SUMME(A1:A10)", locale = "de-DE")
   expect_match(result, "=SUM", fixed = TRUE)
   expect_false(grepl("SUMME", result, fixed = TRUE))
@@ -330,6 +337,7 @@ test_that("multi-segment locale 'de-DE' falls back to 'de'", {
 
 # ── 30. IDENT bindings (LAMBDA params) are not locale-translated ─────────────
 test_that("LAMBDA param named 'sum' is not translated to a locale function", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   # _xlpm.sum should round-trip as 'sum', not as 'SUMME' (German) etc.
   # German output uses ';' as the argument separator.
   result <- from_xml("=_xlfn.LAMBDA(_xlpm.sum, _xlpm.sum + 1)(5)", locale = "de")
@@ -447,6 +455,7 @@ test_that("array literals are one OTHER token with internals shielded", {
 })
 
 test_that("array column/row separators survive locale conversion", {
+  skip_if_not(has_terminology(), "needs terminology cache")
   # German source: outer separator is ';', inner array still uses ,/;
   expect_equal(
     to_xml("=SUM({1,2;3,4};A1)", locale = "de"),
