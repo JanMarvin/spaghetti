@@ -3,8 +3,14 @@
 
 # spaghetti
 
+<!-- badges: start -->
+
+[![R-CMD-check](https://github.com/JanMarvin/spaghetti/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/JanMarvin/spaghetti/actions/workflows/R-CMD-check.yaml)
+[![Codecov test
+coverage](https://codecov.io/gh/JanMarvin/spaghetti/graph/badge.svg)](https://app.codecov.io/gh/JanMarvin/spaghetti)
 [![spaghetti status
 badge](https://janmarvin.r-universe.dev/spaghetti/badges/version)](https://janmarvin.r-universe.dev/spaghetti)
+<!-- badges: end -->
 
 Bidirectional translator between Excel user-facing formulas (as seen in
 the formula bar) and the OOXML storage format (as found inside `.xlsx`
