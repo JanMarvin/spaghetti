@@ -3,6 +3,9 @@
 
 # spaghetti
 
+[![spaghetti status
+badge](https://janmarvin.r-universe.dev/spaghetti/badges/version)](https://janmarvin.r-universe.dev/spaghetti)
+
 Bidirectional translator between Excel user-facing formulas (as seen in
 the formula bar) and the OOXML storage format (as found inside `.xlsx`
 XML).
@@ -33,9 +36,17 @@ handles the translation so you don’t have to remember the rules.
 
 ## Installation
 
+Via remotes:
+
 ``` r
 # install.packages("remotes")
 remotes::install_github("JanMarvin/spaghetti")
+```
+
+Via r-universe:
+
+``` r
+install.packages('spaghetti', repos = c('https://janmarvin.r-universe.dev', 'https://cloud.r-project.org'))
 ```
 
 ## Quick start
