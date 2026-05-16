@@ -139,15 +139,16 @@ setup_terminology <- function(expected_sha256 = .MTC_EXPECTED_SHA256,
 #'
 #' @return Invisibly TRUE if a cache was removed, FALSE if none existed.
 #' @export
-clear_terminology <- function() {  rds_path <- .terminology_path()
-if (!file.exists(rds_path)) {
+clear_terminology <- function() {
+  rds_path <- .terminology_path()
+  if (!file.exists(rds_path)) {
+    .reset_terminology_state()
+    return(invisible(FALSE))
+  }
+  unlink(rds_path)
   .reset_terminology_state()
-  return(invisible(FALSE))
-}
-unlink(rds_path)
-.reset_terminology_state()
-message("Terminology cache cleared.")
-invisible(TRUE)
+  message("Terminology cache cleared.")
+  invisible(TRUE)
 }
 
 #' Metadata about the currently loaded terminology cache.

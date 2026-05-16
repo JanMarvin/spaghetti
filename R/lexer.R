@@ -454,11 +454,14 @@ TOKEN_TYPES <- list(
       while (pos <= n) {
         p <- chars[pos]
         if (grepl("[0-9.]", p, perl = TRUE)) {
-          pos <- pos + 1L; prev <- p
+          pos <- pos + 1L
+          prev <- p
         } else if (p == "e" || p == "E") {
-          pos <- pos + 1L; prev <- p
+          pos <- pos + 1L
+          prev <- p
         } else if ((p == "+" || p == "-") && (prev == "e" || prev == "E")) {
-          pos <- pos + 1L; prev <- p
+          pos <- pos + 1L
+          prev <- p
         } else {
           break
         }

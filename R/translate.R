@@ -130,7 +130,7 @@ from_xml <- function(formula, locale = NULL) {
 
   # Peek the value of the next token, or "" if none.
   next_val <- function() if (i + 1L <= n) tokens[[i + 1L]]$val else ""
-  next_type <- function() if (i + 1L <= n) tokens[[i + 1L]]$type else ""
+  # next_type <- function() if (i + 1L <= n) tokens[[i + 1L]]$type else ""
 
   # Helpers for skipping whitespace OTHER tokens around operators that
   # bind to a ref. Excel/spreadsheet UIs are tolerant of spaces like
@@ -237,7 +237,10 @@ from_xml <- function(formula, locale = NULL) {
       # Already registered as a bound name in some enclosing scope?
       is_known_param <- FALSE
       for (s in lambda_scope) {
-        if (raw_name %in% s$params) { is_known_param <- TRUE; break }
+        if (raw_name %in% s$params) {
+          is_known_param <- TRUE
+          break
+        }
       }
 
       # Register as a new bound name only if at depth==1 of the innermost

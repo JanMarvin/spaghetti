@@ -181,9 +181,9 @@ test_that("function_prefix returns correct tiers", {
 
 # ── 16. is_ooxml() utility ───────────────────────────────────────────────────
 test_that("is_ooxml correctly identifies prefixed formulas", {
-  expect_true( is_ooxml("=_xlfn.SEQUENCE(10)"))
+  expect_true(is_ooxml("=_xlfn.SEQUENCE(10)"))
   expect_false(is_ooxml("=SEQUENCE(10)"))
-  expect_true( is_ooxml("=_xlfn.LAMBDA(_xlpm.x, x)"))
+  expect_true(is_ooxml("=_xlfn.LAMBDA(_xlpm.x, x)"))
   expect_false(is_ooxml("=SUM(A1:A10)"))
 })
 
@@ -283,14 +283,14 @@ test_that("is_ooxml recognises bare _xlws. (hypothetical) tokens", {
 test_that("registry tiers are pairwise disjoint", {
   Lw <- spaghetti:::.spaghetti_env$LEGACY_WORKSHEET
   Lx <- spaghetti:::.spaghetti_env$LEGACY_XLM
-  F  <- spaghetti:::.spaghetti_env$XLFN
-  W  <- spaghetti:::.spaghetti_env$XLWS
+  Ff <- spaghetti:::.spaghetti_env$XLFN
+  Ww <- spaghetti:::.spaghetti_env$XLWS
   expect_length(intersect(Lw, Lx), 0L)
-  expect_length(intersect(Lw, F),  0L)
-  expect_length(intersect(Lw, W),  0L)
-  expect_length(intersect(Lx, F),  0L)
-  expect_length(intersect(Lx, W),  0L)
-  expect_length(intersect(F,  W),  0L)
+  expect_length(intersect(Lw, Ff),  0L)
+  expect_length(intersect(Lw, Ww),  0L)
+  expect_length(intersect(Lx, Ff),  0L)
+  expect_length(intersect(Lx, Ww),  0L)
+  expect_length(intersect(Ff, Ww),  0L)
 })
 
 # ── 26. round_trip() returns named list with 'xml' and 'formula' ─────────────

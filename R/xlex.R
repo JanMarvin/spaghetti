@@ -217,10 +217,10 @@ xlex <- function(formula, locale = NULL, print = TRUE) {
   # ── Print ────────────────────────────────────────────────────────────────
   if (print) {
     # Header row (mirrors tidyxl style)
-    val_w <- max(nchar(df$val), 3L) + 2L
+    # val_w <- max(nchar(df$val), 3L) + 2L
 
     # Root line
-    f_display <- if (startsWith(formula, "=")) formula else paste0("=", formula)
+    # f_display <- if (startsWith(formula, "=")) formula else paste0("=", formula)
     cat("root", "\n")
 
     lines  <- .render_tree(tree)
