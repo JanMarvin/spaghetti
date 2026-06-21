@@ -117,15 +117,15 @@ wb <- wb |>
     cm = TRUE
   )
 
-# XLOOKUP: look up total sales for each unique product using the spill ref
-# to_xml() works with single formulas or vectors
+# MAP: identical to =SUMIF(B2:B7, E2#, C2:C7) just showing some modern functions
+# ref. to_xml() works with single formulas or vectors
 wb <- wb |>
   wb_add_data(
     dims = "F1", x = "Total Sales"
   ) |>
   wb_add_formula(
     dims = "F2",
-    x = to_xml("=XLOOKUP(E2#, B2:B7, C2:C7, 0, 0)"),
+    x = to_xml("=MAP(E2#, LAMBDA(p, SUM((B2:B7=p)*C2:C7)))"),
     cm = TRUE
   )
 
