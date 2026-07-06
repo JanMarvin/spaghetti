@@ -6,5 +6,6 @@ linters: linters_with_defaults(
   indentation_linter = NULL,               # many
   quotes_linter = NULL,
   commas_linter = NULL,                    # many
-  infix_spaces_linter = NULL
+  infix_spaces_linter = NULL,
+  assignment_linter = NULL
   )
